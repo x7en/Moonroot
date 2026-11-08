@@ -1,0 +1,30 @@
+{
+  "PK": {
+    "name": "Pakistan",
+    "emergency": [
+      { "number": "1122", "label": "Rescue 1122", "note": "Emergency ambulance and rescue" },
+      { "number": "115", "label": "Edhi ambulance", "note": "Emergency ambulance service" }
+    ],
+    "mentalHealthLine": ""
+  },
+  "GB": {
+    "name": "United Kingdom",
+    "emergency": [
+      { "number": "999", "label": "Emergency services", "note": "Immediate emergency care" },
+      { "number": "111", "label": "NHS 111", "note": "Urgent medical advice" }
+    ],
+    "mentalHealthLine": ""
+  },
+  "US": {
+    "name": "United States",
+    "emergency": [
+      { "number": "911", "label": "Emergency services", "note": "Immediate emergency care" }
+    ],
+    "mentalHealthLine": ""
+  },
+  "OTHER": {
+    "name": "Other region",
+    "emergency": [],
+    "mentalHealthLine": ""
+  }
+}
