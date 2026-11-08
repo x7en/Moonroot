@@ -11,6 +11,10 @@ export default tseslint.config(
   {
     files: ['**/*.ts', '**/*.tsx'],
     rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       'no-restricted-globals': [
         'error',
         { name: 'fetch', message: 'Network calls are banned in Moonroot.' },
