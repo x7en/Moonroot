@@ -10,12 +10,15 @@ import {
   type DayLog,
   type Decision,
   type DoctorVisit,
+  type Forecast,
   type MedicineEntry,
   type Profile,
   type RuleId,
   type Verdict,
   type WatchItem,
 } from '../model/types';
+import { computeConfidence } from '../predict/confidence';
+import { analyzeLeadInPattern } from '../predict/leadIn';
 import { evaluateTriage } from '../triage/engine';
 
 export type DoctorFileRange = '3m' | '6m' | '12m' | 'all';
@@ -41,6 +44,7 @@ export interface DoctorFileInput {
   decisions?: readonly Decision[];
   verdicts?: readonly Verdict[];
   watchItems?: readonly WatchItem[];
+  forecasts?: readonly Forecast[];
   options: DoctorFileOptions;
 }
 
@@ -115,10 +119,10 @@ function fallbackMinorProfile(today: DateKey): Profile {
 }
 
 /**
- * Step 2 doctor summary builder:
- * Generates Parts 1, 2, 3, 4, 5 (whole range + per period), 7, 10, 11, 12,
- * the plain Daily log table (last 3 months), footer, and machine-readable JSON block.
- * Parts belonging to Steps 3-4 (6, 8, 9) are left out without comment.
+ * Step 3 doctor summary builder:
+ * Generates Parts 1, 2, 3, 4, 5 (whole range + per period), 6 (lead-in pattern),
+ * 7, 10, 11, 12, plain Daily log table (last 3 months), footer, and machine-readable JSON block.
+ * Parts belonging to Step 4 (6 lifestyle patterns, 8, 9) are omitted until implemented.
  */
 export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   const {
@@ -131,6 +135,7 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
     decisions = [],
     verdicts = [],
     watchItems = [],
+    forecasts = [],
     options,
   } = input;
   const format = options.format;
@@ -157,6 +162,18 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   const effectiveProfile = profile ?? fallbackMinorProfile(today);
   const episodeSummary = classifyEpisodes(sortedLogs, decisions, today);
   const cycleSummary = deriveCycles(episodeSummary, decisions, today);
+  const leadIn = analyzeLeadInPattern({
+    today,
+    dayLogs: sortedLogs,
+    cycles: cycleSummary,
+    resolvedForecasts: forecasts,
+  });
+  const confidenceSummary = computeConfidence({
+    activeCycles: cycleSummary.recentValidCyclesAfterBaseline,
+    resolvedForecasts: forecasts,
+    cycles: cycleSummary.cycles,
+    newBaselineDate: cycleSummary.newBaselineDate,
+  });
   const triage = evaluateTriage({
     today,
     profile: effectiveProfile,
@@ -398,6 +415,34 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
     lines.push(`- Most common symptoms: ${summary}.`);
   } else {
     lines.push('- Symptoms logged: none in this range.');
+  }
+  lines.push('');
+
+  // Part 6. Patterns the app found (Step 3: lead-in pattern only; wording states pattern, not proof)
+  lines.push(heading('6. Patterns the app found', format, 2));
+  const totalCyclesChecked =
+    cycleSummary.cycles.filter((c) => !c.beforeBaseline).length +
+    (cycleSummary.openCycle &&
+    (cycleSummary.newBaselineDate === null ||
+      cycleSummary.openCycle.startDate >= cycleSummary.newBaselineDate)
+      ? 1
+      : 0);
+  if (leadIn.status === 'learned' && leadIn.offsetRangeDays && leadIn.medianOffsetDays !== null) {
+    lines.push(
+      `- Lead-in pattern (spotting or cramps of 3 or more before flow): seen in ${leadIn.cyclesWithSignal} of ${Math.max(leadIn.cyclesWithSignal, totalCyclesChecked)} cycle(s), typically ${leadIn.medianOffsetDays} days before flow starts (likely offset ${leadIn.offsetRangeDays[0]} to ${leadIn.offsetRangeDays[1]} days; ${leadIn.followedSignalEvents} of ${leadIn.totalSignalEvents} signal events followed by flow within 14 days). This is a pattern in logged data, not proof of cause.`,
+    );
+  } else if (leadIn.status === 'unreliable') {
+    lines.push(
+      `- Lead-in signals: spotting or cramps of 3 or more appeared before ${leadIn.cyclesWithSignal} cycle(s), but fewer than 60% of signal events (${leadIn.followedSignalEvents} of ${leadIn.totalSignalEvents}) were followed by flow within 14 days, so it is not used as a pattern.`,
+    );
+  } else if (leadIn.status === 'retired') {
+    lines.push(
+      `- Lead-in pattern: previously noted across ${leadIn.cyclesWithSignal} cycle(s), but missed its likely window in 2 of the last 3 uses ("This pattern is not holding.").`,
+    );
+  } else {
+    lines.push(
+      `- Lead-in pattern: not enough consistent cycles yet (${leadIn.cyclesWithSignal} of 4 cycles with pre-flow spotting or cramps of 3 or more).`,
+    );
   }
   lines.push('');
 
@@ -767,6 +812,14 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
       baselineDate: cycleSummary.newBaselineDate,
       daysSinceLastStart: cycleSummary.daysSinceLastPeriodStart,
       longestGapDays: longestGap,
+    },
+    confidenceScore: confidenceSummary.score,
+    leadInPattern: {
+      status: leadIn.status,
+      cyclesWithSignal: leadIn.cyclesWithSignal,
+      totalSignalEvents: leadIn.totalSignalEvents,
+      followedSignalEvents: leadIn.followedSignalEvents,
+      offsetRangeDays: leadIn.offsetRangeDays,
     },
     standingFlags: triage.standingFlags.map((s) => ({
       ruleId: s.ruleId,

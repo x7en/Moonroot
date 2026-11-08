@@ -382,8 +382,8 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
           </p>
           <p>Each period you log tightens your ranges.</p>
           <p class="notice-banner">
-            Step 1 records your daily logs, medicines, backups and doctor file. Predictions and
-            companion growth arrive in later steps.
+            Your daily logs, safety checks, cycle ranges, backups and doctor file all stay on this
+            phone.
           </p>
           <div class="btn-row">
             <button type="button" class="btn" onClick={() => setStep(5)}>

@@ -173,6 +173,7 @@ describe('core/report/doctorFile (Step 2 parts: 1, 2, 3, 4, 5 per-period, 7, 10,
     expect(md.content).toContain('## 3. Cycle history');
     expect(md.content).toContain('## 4. Bleeding detail');
     expect(md.content).toContain('## 5. Pain and symptoms');
+    expect(md.content).toContain('## 6. Patterns the app found');
     expect(md.content).toContain('## 7. Flags raised');
     expect(md.content).toContain('## 10. Tests, medicines and visits');
     expect(md.content).toContain('## 11. Questions to ask');

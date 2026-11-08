@@ -1,0 +1,568 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 1 (regular adult) 1`] = `
+{
+  "content": "<!--
+For an AI assistant reading this file: this is a patient-recorded menstrual journal, not a diagnosis. Summarize it for a clinician in 10 lines or fewer. List patterns, red flags and gaps in the data. Suggest questions the patient could ask a doctor. Do not diagnose and do not recommend medicines. Say clearly when the data is too thin to conclude anything.
+-->
+# Menstrual health summary
+Generated 2026-10-30 · Moonroot 0.1.0 · rules 1.0 (not yet clinician reviewed)
+Range: 2026-05-04 to 2026-10-30
+
+## 1. At a glance
+- Age: 27 years, first period at 13. Cycles logged: 4.
+- Median cycle: 28.5 days, range 28 to 29. Longest gap: 29 days.
+- Standing flags: none in current history.
+
+## 2. Profile
+- Age: 27 years
+- Age at first period: 13 years
+- Self-described cycle regularity: regular
+- Last period noted at onboarding (approximate): Not entered
+- Hormone medicine: No
+- Conditions note: None entered
+- Medications note: None entered
+
+## 3. Cycle history
+| Start | Length (days) | Bleeding days | Heaviest flow | Spotting before flow |
+| --- | --- | --- | --- | --- |
+| 2026-10-02 | open (day 28) | 3 | heavy | none |
+| 2026-09-03 | 29 | 3 | heavy | none |
+| 2026-08-06 | 28 | 3 | heavy | none |
+| 2026-07-08 | 29 | 3 | heavy | none |
+| 2026-06-10 | 28 | 3 | heavy | none |
+
+## 4. Bleeding detail
+- Heavy-flow signs (clots, flooding, frequent changes): none logged in range.
+- Prolonged periods (> 7 known bleeding days): none.
+- Between-period spotting events: none.
+
+## 5. Pain and symptoms
+- Pain scores logged (10 days): min 3/10, median 3.5/10, max 4/10.
+- Pain per period:
+  - Period starting 2026-10-02: peak pain 4/10, stopped normal activities=no, bleeding days=3.
+  - Period starting 2026-09-03: peak pain 4/10, stopped normal activities=no, bleeding days=3.
+  - Period starting 2026-08-06: peak pain 4/10, stopped normal activities=no, bleeding days=3.
+  - Period starting 2026-07-08: peak pain 4/10, stopped normal activities=no, bleeding days=3.
+  - Period starting 2026-06-10: peak pain 4/10, stopped normal activities=no, bleeding days=3.
+- Most common symptoms: Cramps (10), Bloating (5).
+
+## 6. Patterns the app found
+- Lead-in pattern: not enough consistent cycles yet (0 of 4 cycles with pre-flow spotting or cramps of 3 or more).
+
+## 7. Flags raised
+- Verdict and event flags: none raised in this range.
+
+## 10. Tests, medicines and visits
+- Pregnancy tests: none logged in this range.
+- Doctor visits: none logged in this range.
+- As-needed medicines (sums of entries logged):
+  - mefenamic acid (Ponstan): 1 doses across 1 days (~0/week), 500 mg from entered strengths; helped: yes=1, a little=0, no=0, unsure=0.
+- Note: Medicine totals are sums of her own entries, with no assessment of amount.
+
+## 11. Questions to ask
+- "I take Ponstan for pain on 1 day(s). Is this the right medicine and amount for me, and is there anything better?"
+
+## 12. Data quality
+- Days logged: 15 out of 180 days in range.
+- Approximate entries: 0. Backfilled entries: 0.
+- Multi-day gaps (2 or more unlogged days between logs): 4.
+
+## Daily log (last 3 months)
+| Date | Flow | Protection | Clots | Pain | Symptoms | Danger signs | Medicines | Note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-08-06 | medium | pad | - | 3/10 | Cramps; Bloating | none | - | - |
+| 2026-08-07 | heavy | pad | - | 4/10 | Cramps | none | - | Warm water helped, felt better later |
+| 2026-08-08 | light | pad | - | - | - | none | - | - |
+| 2026-09-03 | medium | pad | - | 3/10 | Cramps; Bloating | none | - | - |
+| 2026-09-04 | heavy | pad | - | 4/10 | Cramps | none | - | Warm water helped, felt better later |
+| 2026-09-05 | light | pad | - | - | - | none | - | - |
+| 2026-10-02 | medium | pad | - | 3/10 | Cramps; Bloating | none | - | - |
+| 2026-10-03 | heavy | pad | - | 4/10 | Cramps | none | mefenamic acid x2 | Warm water helped, felt better later |
+| 2026-10-04 | light | pad | - | - | - | none | - | - |
+
+## About this file
+- Disclaimer: Moonroot is a private journal that records symptoms and sorts urgency. It does not diagnose any condition.
+- Version: Moonroot 0.1.0 · rules 1.0 · Clinician review: Not yet clinician reviewed
+
+## Machine-readable data
+\`\`\`json
+{
+  "schemaVersion": 1,
+  "rulesetVersion": "1.0",
+  "clinicianReviewed": false,
+  "generated": "2026-10-30",
+  "range": {
+    "from": "2026-05-04",
+    "to": "2026-10-30"
+  },
+  "daysLogged": 15,
+  "daysCovered": 180,
+  "symptomCounts": {
+    "cramps": 10,
+    "bloating": 5
+  },
+  "painSummary": {
+    "days": 10,
+    "min": 3,
+    "median": 3.5,
+    "max": 4
+  },
+  "cyclesSummary": {
+    "validCyclesCount": 4,
+    "validCycleLengths": [
+      28,
+      29,
+      28,
+      29
+    ],
+    "baselineDate": null,
+    "daysSinceLastStart": 28,
+    "longestGapDays": 29
+  },
+  "confidenceScore": 40,
+  "leadInPattern": {
+    "status": "insufficient",
+    "cyclesWithSignal": 0,
+    "totalSignalEvents": 0,
+    "followedSignalEvents": 0,
+    "offsetRangeDays": null
+  },
+  "standingFlags": [],
+  "openEventIds": [],
+  "medicinesSummary": {
+    "from": "2026-05-04",
+    "to": "2026-10-30",
+    "asNeeded": [
+      {
+        "key": "mefenamic acid",
+        "genericName": "mefenamic acid",
+        "shownNames": [
+          "Ponstan"
+        ],
+        "sameMedicineFlag": false,
+        "totalDoses": 1,
+        "weeklyAverageDoses": 0,
+        "daysWithDose": 1,
+        "totalUnits": 2,
+        "totalMg": 500,
+        "dosesWithoutStrength": 0,
+        "helpedCounts": {
+          "yes": 1,
+          "a-little": 0,
+          "no": 0,
+          "unsure": 0,
+          "unanswered": 0
+        }
+      }
+    ],
+    "courses": []
+  }
+}
+\`\`\`
+",
+  "filename": "moonroot-doctor-2026-10-30.md",
+}
+`;
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 1 (regular adult) 2`] = `
+{
+  "content": "date,flow,products,clots,pain,symptoms,mood,sleep_hours,water_ml,stool_type,bbt_c,lh,mucus,medicines,note
+2026-06-10,medium,pad (4),,3,Cramps; Bloating,3,,,,,,,,
+2026-06-11,heavy,pad (5),,4,Cramps,,,,,,,,,"Warm water helped, felt better later"
+2026-06-12,light,pad (2),,,,,,,,,,,,
+2026-07-08,medium,pad (4),,3,Cramps; Bloating,3,,,,,,,,
+2026-07-09,heavy,pad (5),,4,Cramps,,,,,,,,,"Warm water helped, felt better later"
+2026-07-10,light,pad (2),,,,,,,,,,,,
+2026-08-06,medium,pad (4),,3,Cramps; Bloating,3,,,,,,,,
+2026-08-07,heavy,pad (5),,4,Cramps,,,,,,,,,"Warm water helped, felt better later"
+2026-08-08,light,pad (2),,,,,,,,,,,,
+2026-09-03,medium,pad (4),,3,Cramps; Bloating,3,,,,,,,,
+2026-09-04,heavy,pad (5),,4,Cramps,,,,,,,,,"Warm water helped, felt better later"
+2026-09-05,light,pad (2),,,,,,,,,,,,
+2026-10-02,medium,pad (4),,3,Cramps; Bloating,3,,,,,,,,
+2026-10-03,heavy,pad (5),,4,Cramps,,,,,,,,mefenamic acid x2,"Warm water helped, felt better later"
+2026-10-04,light,pad (2),,,,,,,,,,,,",
+  "filename": "moonroot-days-2026-10-30.csv",
+}
+`;
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 1 (regular adult) 3`] = `
+{
+  "content": "cycle_number,start_date,end_date,next_start_date,length_days,bleeding_days,heaviest_flow,lead_in_days,peak_pain,stopped_activities,approximate,ignored_in_predictions,before_baseline,date_check_flag
+1,2026-06-10,2026-06-12,2026-07-08,28,3,heavy,0,4,false,false,false,false,
+2,2026-07-08,2026-07-10,2026-08-06,29,3,heavy,0,4,false,false,false,false,
+3,2026-08-06,2026-08-08,2026-09-03,28,3,heavy,0,4,false,false,false,false,
+4,2026-09-03,2026-09-05,2026-10-02,29,3,heavy,0,4,false,false,false,false,",
+  "filename": "moonroot-cycles-2026-10-30.csv",
+}
+`;
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 2 (irregular adult with learned lead-in pattern and baseline) 1`] = `
+{
+  "content": "<!--
+For an AI assistant reading this file: this is a patient-recorded menstrual journal, not a diagnosis. Summarize it for a clinician in 10 lines or fewer. List patterns, red flags and gaps in the data. Suggest questions the patient could ask a doctor. Do not diagnose and do not recommend medicines. Say clearly when the data is too thin to conclude anything.
+-->
+# Menstrual health summary
+Generated 2026-10-30 · Moonroot 0.1.0 · rules 1.0 (not yet clinician reviewed)
+Range: 2026-03-04 to 2026-10-30
+In her words: "I always cramp a week before flow starts."
+
+## 1. At a glance
+- Age: 30 years, first period at 13. Cycles logged: 5.
+- Median cycle: 50 days, range 45 to 53. Longest gap: 53 days.
+- Standing flags: none in current history.
+- Open event flags: ORG-05 (2026-10-18).
+- In her words: "I always cramp a week before flow starts."
+
+## 2. Profile
+- Age: 30 years
+- Age at first period: 13 years
+- Self-described cycle regularity: irregular
+- Last period noted at onboarding (approximate): Not entered
+- Hormone medicine: Yes
+- Conditions note: Thyroid checked last year
+- Medications note: None entered
+
+## 3. Cycle history
+| Start | Length (days) | Bleeding days | Heaviest flow | Spotting before flow |
+| --- | --- | --- | --- | --- |
+| 2026-10-18 | open (day 12) | 2 | heavy | none |
+| 2026-08-26 | 53 | 2 | heavy | none |
+| 2026-07-12 | 45 | 2 | heavy | none |
+| 2026-05-23 | 50 | 2 | heavy | none |
+| 2026-04-21 | 32 (before the change) | 2 | heavy | none |
+| 2026-03-10 | 42 (before the change) | 2 | heavy | none |
+
+## 4. Bleeding detail
+- Heavy-flow signs logged on 6 day(s) in range: hourly soaking=0, every 1-2h change=0, large clots=0, flooding=0.
+- Prolonged periods (> 7 known bleeding days): none.
+- Between-period spotting events: none.
+
+## 5. Pain and symptoms
+- Pain scores logged (12 days): min 3/10, median 4.5/10, max 6/10.
+- Pain per period:
+  - Period starting 2026-10-18: peak pain 6/10, stopped normal activities=no, bleeding days=2.
+  - Period starting 2026-08-26: peak pain 6/10, stopped normal activities=no, bleeding days=2.
+  - Period starting 2026-07-12: peak pain 6/10, stopped normal activities=no, bleeding days=2.
+  - Period starting 2026-05-23: peak pain 6/10, stopped normal activities=no, bleeding days=2.
+  - Period starting 2026-04-21: peak pain 6/10, stopped normal activities=no, bleeding days=2.
+  - Period starting 2026-03-10: peak pain 6/10, stopped normal activities=no, bleeding days=2.
+- Most common symptoms: Cramps (12), Tiredness (6).
+
+## 6. Patterns the app found
+- Lead-in pattern (spotting or cramps of 3 or more before flow): seen in 4 of 4 cycle(s), typically 7 days before flow starts (likely offset 6 to 7 days; 4 of 4 signal events followed by flow within 14 days). This is a pattern in logged data, not proof of cause.
+
+## 7. Flags raised
+- Verdict and event log:
+  - 2026-10-18 [orange] ORG-05: Because 2 of your last 3 cycles were longer than the usual range for your age. — open.
+  - 2026-10-30 [yellow] YEL-04: Because your latest cycle fell outside the typical range for your age. — active today.
+
+## 10. Tests, medicines and visits
+- Pregnancy tests: none logged in this range.
+- Doctor visit on 2026-10-05: Follow-up discussed cycles
+- As-needed medicines: none logged in this range.
+- Regular medicine courses:
+  - Combined pill (combined-hormone): started 2026-06-01, ongoing.
+- Note: Medicine totals are sums of her own entries, with no assessment of amount.
+
+## 11. Questions to ask
+- "I started Combined pill on 2026-06-01. How should that change my cycles?"
+
+## 12. Data quality
+- Days logged: 18 out of 241 days in range.
+- Approximate entries: 0. Backfilled entries: 0.
+- Multi-day gaps (2 or more unlogged days between logs): 11.
+
+## Daily log (last 3 months)
+| Date | Flow | Protection | Clots | Pain | Symptoms | Danger signs | Medicines | Note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-08-20 | spotting | - | - | 3/10 | Cramps | none | - | Early spotting + cramps |
+| 2026-08-26 | heavy | pad | small | 6/10 | Cramps; Tiredness | none | - | - |
+| 2026-08-27 | medium | pad | - | - | - | none | - | - |
+| 2026-10-11 | spotting | - | - | 3/10 | Cramps | none | - | Early spotting + cramps |
+| 2026-10-18 | heavy | pad | small | 6/10 | Cramps; Tiredness | none | - | - |
+| 2026-10-19 | medium | pad | - | - | - | none | - | - |
+
+## About this file
+- Disclaimer: Moonroot is a private journal that records symptoms and sorts urgency. It does not diagnose any condition.
+- Version: Moonroot 0.1.0 · rules 1.0 · Clinician review: Not yet clinician reviewed
+
+## Machine-readable data
+\`\`\`json
+{
+  "schemaVersion": 1,
+  "rulesetVersion": "1.0",
+  "clinicianReviewed": false,
+  "generated": "2026-10-30",
+  "range": {
+    "from": "2026-03-04",
+    "to": "2026-10-30"
+  },
+  "daysLogged": 18,
+  "daysCovered": 241,
+  "symptomCounts": {
+    "cramps": 12,
+    "tiredness": 6
+  },
+  "painSummary": {
+    "days": 12,
+    "min": 3,
+    "median": 4.5,
+    "max": 6
+  },
+  "cyclesSummary": {
+    "validCyclesCount": 5,
+    "validCycleLengths": [
+      50,
+      45,
+      53
+    ],
+    "baselineDate": "2026-04-25",
+    "daysSinceLastStart": 12,
+    "longestGapDays": 53
+  },
+  "confidenceScore": 27,
+  "leadInPattern": {
+    "status": "learned",
+    "cyclesWithSignal": 4,
+    "totalSignalEvents": 4,
+    "followedSignalEvents": 4,
+    "offsetRangeDays": [
+      6,
+      7
+    ]
+  },
+  "standingFlags": [],
+  "openEventIds": [
+    "ORG-05"
+  ],
+  "medicinesSummary": {
+    "from": "2026-03-04",
+    "to": "2026-10-30",
+    "asNeeded": [],
+    "courses": [
+      {
+        "id": "irreg-m1",
+        "nameShown": "Combined pill",
+        "genericName": "combined-hormone",
+        "category": "hormone",
+        "startDate": "2026-06-01",
+        "stopDate": null
+      }
+    ]
+  }
+}
+\`\`\`
+",
+  "filename": "moonroot-doctor-2026-10-30.md",
+}
+`;
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 2 (irregular adult with learned lead-in pattern and baseline) 2`] = `
+{
+  "content": "date,flow,products,clots,pain,symptoms,mood,sleep_hours,water_ml,stool_type,bbt_c,lh,mucus,medicines,note
+2026-03-04,spotting,,,3,Cramps,,,,,,,,,Early spotting + cramps
+2026-03-10,heavy,pad,small,6,Cramps; Tiredness,,,,,,,,,
+2026-03-11,medium,pad,,,,,,,,,,,,
+2026-04-14,spotting,,,3,Cramps,,,,,,,,,Early spotting + cramps
+2026-04-21,heavy,pad,small,6,Cramps; Tiredness,,,,,,,,,
+2026-04-22,medium,pad,,,,,,,,,,,,
+2026-05-17,spotting,,,3,Cramps,,,,,,,,,Early spotting + cramps
+2026-05-23,heavy,pad,small,6,Cramps; Tiredness,,,,,,,,,
+2026-05-24,medium,pad,,,,,,,,,,,,
+2026-07-05,spotting,,,3,Cramps,,,,,,,,,Early spotting + cramps
+2026-07-12,heavy,pad,small,6,Cramps; Tiredness,,,,,,,,,
+2026-07-13,medium,pad,,,,,,,,,,,,
+2026-08-20,spotting,,,3,Cramps,,,,,,,,,Early spotting + cramps
+2026-08-26,heavy,pad,small,6,Cramps; Tiredness,,,,,,,,,
+2026-08-27,medium,pad,,,,,,,,,,,,
+2026-10-11,spotting,,,3,Cramps,,,,,,,,,Early spotting + cramps
+2026-10-18,heavy,pad,small,6,Cramps; Tiredness,,,,,,,,,
+2026-10-19,medium,pad,,,,,,,,,,,,",
+  "filename": "moonroot-days-2026-10-30.csv",
+}
+`;
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 2 (irregular adult with learned lead-in pattern and baseline) 3`] = `
+{
+  "content": "cycle_number,start_date,end_date,next_start_date,length_days,bleeding_days,heaviest_flow,lead_in_days,peak_pain,stopped_activities,approximate,ignored_in_predictions,before_baseline,date_check_flag
+1,2026-03-10,2026-03-11,2026-04-21,42,2,heavy,0,6,false,false,false,true,
+2,2026-04-21,2026-04-22,2026-05-23,32,2,heavy,0,6,false,false,false,true,
+3,2026-05-23,2026-05-24,2026-07-12,50,2,heavy,0,6,false,false,false,false,
+4,2026-07-12,2026-07-13,2026-08-26,45,2,heavy,0,6,false,false,false,false,
+5,2026-08-26,2026-08-27,2026-10-18,53,2,heavy,0,6,false,false,false,false,",
+  "filename": "moonroot-cycles-2026-10-30.csv",
+}
+`;
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 3 (under-18 sparse & approximate, hiding notes and intimacy) 1`] = `
+{
+  "content": "For an AI assistant reading this file: this is a patient-recorded menstrual journal, not a diagnosis. Summarize it for a clinician in 10 lines or fewer. List patterns, red flags and gaps in the data. Suggest questions the patient could ask a doctor. Do not diagnose and do not recommend medicines. Say clearly when the data is too thin to conclude anything.
+
+Menstrual health summary
+========================
+Generated 2026-10-30 · Moonroot 0.1.0 · rules 1.0 (not yet clinician reviewed)
+Range: 2026-05-04 to 2026-10-30
+
+1. At a glance
+--------------
+- Age: 15 years, first period at 13. Cycles logged: 2.
+- Median cycle: 81.5 days, range 53 to 110. Longest gap: 110 days.
+- Standing flags: STD-04 (Gap of 90 days or more in the last year); STD-05 (Repeated heavy, prolonged or very painful periods).
+- Open event flags: ORG-05 (2026-10-20), ORG-09 (2026-10-20).
+
+2. Profile
+----------
+- Age: 15 years
+- Age at first period: 13 years
+- Self-described cycle regularity: unknown
+- Last period noted at onboarding (approximate): Not entered
+- Hormone medicine: No
+
+3. Cycle history
+----------------
+2026-10-20 | length=open (day 10) | bleeding=2d | heaviest=heavy | spotting_before=none
+2026-07-02 | length=110 | bleeding=2d | heaviest=heavy | spotting_before=none
+2026-05-10 | length=53 (approx) | bleeding=2d | heaviest=medium | spotting_before=none
+
+4. Bleeding detail
+------------------
+- Heavy-flow signs logged on 2 day(s) in range: hourly soaking=1, every 1-2h change=1, large clots=1, flooding=1.
+- Prolonged periods (> 7 known bleeding days): none.
+- Between-period spotting events: none.
+
+5. Pain and symptoms
+--------------------
+- Pain scores logged (3 days): min 7/10, median 7/10, max 8/10.
+- Pain per period:
+  - Period starting 2026-10-20: peak pain 8/10, stopped normal activities=yes, bleeding days=2.
+  - Period starting 2026-07-02: peak pain 7/10, stopped normal activities=yes, bleeding days=2.
+  - Period starting 2026-05-10: peak pain 0/10, stopped normal activities=no, bleeding days=2.
+- Most common symptoms: Headache (1), Tiredness (1).
+
+6. Patterns the app found
+-------------------------
+- Lead-in pattern: not enough consistent cycles yet (0 of 4 cycles with pre-flow spotting or cramps of 3 or more).
+
+7. Flags raised
+---------------
+- Standing history flags:
+  - STD-04: Gap of 90 days or more in the last year — You went 90 days or more without a period in the last 12 months.
+  - STD-05: Repeated heavy, prolonged or very painful periods — 2 or more of your last 3 periods included heavy bleeding, lasting over 7 days, or severe pain.
+- Verdict and event log:
+  - 2026-10-20 [orange] ORG-05: Because 2 of your last 3 cycles were longer than the usual range for your age. — open.
+  - 2026-10-20 [orange] ORG-09: Because pain reached 7 or more, or stopped your normal activities, in 2 of your last 3 periods. — open.
+  - 2026-10-30 [yellow] YEL-04: Because your latest cycle fell outside the typical range for your age. — active today.
+
+10. Tests, medicines and visits
+-------------------------------
+- Pregnancy tests: none logged in this range.
+- Doctor visits: none logged in this range.
+
+11. Questions to ask
+--------------------
+- "I went 110 days without a period. Should anything be checked?"
+- "My pain reached 8 out of 10 in 2 periods. What could cause this, and what can help?"
+
+12. Data quality
+----------------
+- Days logged: 6 out of 180 days in range.
+- Approximate entries: 2. Backfilled entries: 0.
+- Multi-day gaps (2 or more unlogged days between logs): 2.
+
+Daily log (last 3 months)
+-------------------------
+2026-10-20 | flow=heavy | prot=- | clots=- | pain=8/10 | symptoms=- | danger=none | meds=(omitted) | note=(omitted)
+2026-10-21 | flow=medium | prot=- | clots=- | pain=- | symptoms=Headache; Tiredness | danger=none | meds=(omitted) | note=(omitted)
+
+About this file
+---------------
+- Disclaimer: Moonroot is a private journal that records symptoms and sorts urgency. It does not diagnose any condition.
+- Version: Moonroot 0.1.0 · rules 1.0 · Clinician review: Not yet clinician reviewed
+
+Machine-readable data
+---------------------
+{
+  "schemaVersion": 1,
+  "rulesetVersion": "1.0",
+  "clinicianReviewed": false,
+  "generated": "2026-10-30",
+  "range": {
+    "from": "2026-05-04",
+    "to": "2026-10-30"
+  },
+  "daysLogged": 6,
+  "daysCovered": 180,
+  "symptomCounts": {
+    "headache": 1,
+    "tiredness": 1
+  },
+  "painSummary": {
+    "days": 3,
+    "min": 7,
+    "median": 7,
+    "max": 8
+  },
+  "cyclesSummary": {
+    "validCyclesCount": 2,
+    "validCycleLengths": [
+      53,
+      110
+    ],
+    "baselineDate": null,
+    "daysSinceLastStart": 10,
+    "longestGapDays": 110
+  },
+  "confidenceScore": 16,
+  "leadInPattern": {
+    "status": "insufficient",
+    "cyclesWithSignal": 0,
+    "totalSignalEvents": 0,
+    "followedSignalEvents": 0,
+    "offsetRangeDays": null
+  },
+  "standingFlags": [
+    {
+      "ruleId": "STD-04",
+      "title": "Gap of 90 days or more in the last year",
+      "reason": "You went 90 days or more without a period in the last 12 months."
+    },
+    {
+      "ruleId": "STD-05",
+      "title": "Repeated heavy, prolonged or very painful periods",
+      "reason": "2 or more of your last 3 periods included heavy bleeding, lasting over 7 days, or severe pain."
+    }
+  ],
+  "openEventIds": [
+    "ORG-05",
+    "ORG-09"
+  ],
+  "medicinesSummary": null
+}
+",
+  "filename": "moonroot-doctor-2026-10-30.txt",
+}
+`;
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 3 (under-18 sparse & approximate, hiding notes and intimacy) 2`] = `
+{
+  "content": "date,flow,products,clots,pain,symptoms,mood,sleep_hours,water_ml,stool_type,bbt_c,lh,mucus,medicines,note
+2026-05-10,medium,,,,,,,,,,,,,
+2026-05-11,medium,,,,,,,,,,,,,
+2026-07-02,heavy,,large,7,,,,,,,,,,
+2026-07-03,heavy,,,7,,,,,,,,,,
+2026-10-20,heavy,,,8,,,,,,,,,,
+2026-10-21,medium,,,,Headache; Tiredness,,,,,,,,,",
+  "filename": "moonroot-days-2026-10-30.csv",
+}
+`;
+
+exports[`Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tables across 3 fixture patients > matches golden snapshots for Fixture 3 (under-18 sparse & approximate, hiding notes and intimacy) 3`] = `
+{
+  "content": "cycle_number,start_date,end_date,next_start_date,length_days,bleeding_days,heaviest_flow,lead_in_days,peak_pain,stopped_activities,approximate,ignored_in_predictions,before_baseline,date_check_flag
+1,2026-05-10,2026-05-11,2026-07-02,53,2,medium,0,0,false,true,false,false,
+2,2026-07-02,2026-07-03,2026-10-20,110,2,heavy,0,7,true,false,false,false,",
+  "filename": "moonroot-cycles-2026-10-30.csv",
+}
+`;

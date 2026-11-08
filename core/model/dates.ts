@@ -82,6 +82,15 @@ export function diffDays(from: DateKey, to: DateKey): number {
   return daysFromCivil(b.year, b.month, b.day) - daysFromCivil(a.year, a.month, a.day);
 }
 
+export function yearsSinceMenarche(
+  profile: Pick<Profile, 'birthYear' | 'menarcheAge'>,
+  today: DateKey,
+): number | null {
+  if (profile.birthYear === null || profile.menarcheAge === null) return null;
+  const { year } = parseDateKey(today);
+  return year - profile.birthYear - profile.menarcheAge;
+}
+
 export function isUnder18(profile: Pick<Profile, 'birthYear'>, today: DateKey): boolean {
   if (profile.birthYear === null) return true;
   const { year } = parseDateKey(today);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-  computeStep2Snapshot,
+  computeStep3Snapshot,
   getWatchCheckLabel,
   makeEmptyDayLog,
   summarizeWatchItem,
@@ -16,6 +16,7 @@ import type {
   Decision,
   DoctorVisit,
   Flow,
+  Forecast,
   MedicineEntry,
   PainSite,
   Profile,
@@ -31,6 +32,7 @@ import { isNeutralPregnancyQuestionAllowed } from '../../core/triage/flowEngine'
 import { DangerSignSheet } from '../components/DangerSignSheet';
 import { FLOW_OPTIONS, FlowGlyph } from '../components/FlowGlyphs';
 import { MedicineSheet } from '../components/MedicineSheet';
+import { formatShortDate } from './CycleScreen';
 
 interface TodayScreenProps {
   today: DateKey;
@@ -40,6 +42,7 @@ interface TodayScreenProps {
   dayLog: DayLog | null;
   dayLogs: readonly DayLog[];
   decisions: readonly Decision[];
+  forecasts?: readonly Forecast[];
   medicines: readonly MedicineEntry[];
   verdicts: readonly Verdict[];
   watchItems: readonly WatchItem[];
@@ -107,6 +110,7 @@ export function TodayScreen({
   dayLog,
   dayLogs,
   decisions,
+  forecasts = [],
   medicines,
   verdicts,
   watchItems,
@@ -142,13 +146,13 @@ export function TodayScreen({
     setNoteDraft(dayLog?.note ?? '');
   }, [selectedDate, dayLog?.note]);
 
-  const step2 = computeStep2Snapshot(
+  const step2 = computeStep3Snapshot(
     {
       profile,
       dayLogs: [...dayLogs],
       bodyLogs: [],
       decisions: [...decisions],
-      forecasts: [],
+      forecasts: [...forecasts],
       verdicts: [...verdicts],
       watchItems: [...watchItems],
       visits: [...visits],
@@ -385,6 +389,16 @@ export function TodayScreen({
           )}
         </section>
       )}
+
+      <p class="notice-banner tabular" aria-label="Forecast summary" style={{ marginBottom: '12px' }}>
+        {step2.prediction.likely
+          ? `Forecast (${step2.prediction.confidence.score}% confidence): next period likely between ${formatShortDate(step2.prediction.likely[0])} and ${formatShortDate(step2.prediction.likely[1])}.`
+          : step2.prediction.droppedLikelyWindow && step2.prediction.daysSinceStart !== null
+            ? `Forecast (${step2.prediction.confidence.score}% confidence): Day ${step2.prediction.daysSinceStart}.${step2.prediction.longestGapDays !== null ? ` Longest gap logged is ${step2.prediction.longestGapDays} days.` : ''}`
+            : step2.cycles.openCycle
+              ? `Forecast (${step2.prediction.confidence.score}% confidence): Day ${step2.cycles.openCycle.daysSinceStart}. Log another cycle to narrow ranges.`
+              : 'Confidence 10%. Log your first period to start forecasts.'}
+      </p>
 
       {selectedDate === today && step2.catchUpDays.length >= 2 && !catchUpHidden && (
         <section class="card" aria-label="Catch-up check-in" style={{ borderColor: 'var(--lamp)' }}>

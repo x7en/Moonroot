@@ -13,6 +13,7 @@
     "lint": "npm run lint:eslint && npm run lint:deps && npm run lint:copy",
     "test": "vitest run",
     "rules:export": "tsx scripts/export-rules.ts",
+    "sim": "tsx scripts/sim.ts",
     "build:core": "tsc -p tsconfig.build.json",
     "build": "npm run build:core && vite build"
   },

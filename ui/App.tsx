@@ -19,11 +19,12 @@ import { DoctorFileSheet } from './components/DoctorFileSheet';
 import { GetHelpSheet } from './components/GetHelpSheet';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { PinLockScreen } from './screens/PinLockScreen';
+import { CycleScreen } from './screens/CycleScreen';
 import { RecordScreen } from './screens/RecordScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { TodayScreen } from './screens/TodayScreen';
 
-type Tab = 'today' | 'record' | 'settings';
+type Tab = 'today' | 'cycle' | 'record' | 'settings';
 
 interface UndoState {
   date: DateKey;
@@ -182,6 +183,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             dayLog={store.getDayLog(selectedDate)}
             dayLogs={store.snapshot.dayLogs}
             decisions={store.snapshot.decisions}
+            forecasts={store.snapshot.forecasts}
             medicines={store.snapshot.medicines}
             verdicts={store.snapshot.verdicts}
             watchItems={store.snapshot.watchItems}
@@ -217,6 +219,38 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               refresh();
             }}
             onOpenGetHelp={() => setGetHelpOpen(true)}
+          />
+        )}
+
+        {tab === 'cycle' && (
+          <CycleScreen
+            today={today}
+            nowIso={nowIso}
+            profile={profile}
+            dayLogs={store.snapshot.dayLogs}
+            decisions={store.snapshot.decisions}
+            forecasts={store.snapshot.forecasts}
+            medicines={store.snapshot.medicines}
+            verdicts={store.snapshot.verdicts}
+            watchItems={store.snapshot.watchItems}
+            visits={store.snapshot.visits}
+            meta={store.snapshot.meta}
+            onEditDay={(date) => {
+              setSelectedDate(date);
+              setTab('today');
+            }}
+            onSaveApproximatePeriod={async (startDate, durationDays) => {
+              await store.saveApproximatePeriod(startDate, durationDays, nowIso);
+              refresh();
+            }}
+            onSaveDecision={async (dec: Decision) => {
+              await store.saveDecision(dec);
+              refresh();
+            }}
+            onDeleteDecision={async (id) => {
+              await store.deleteDecision(id);
+              refresh();
+            }}
           />
         )}
 
@@ -314,6 +348,14 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           </button>
           <button
             type="button"
+            class="nav-tab"
+            aria-current={tab === 'cycle' ? 'page' : undefined}
+            onClick={() => setTab('cycle')}
+          >
+            Cycle
+          </button>
+          <button
+            type="button"
             class="nav-log-fab"
             aria-label="Log today"
             onClick={() => {
@@ -360,6 +402,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         decisions={store.snapshot.decisions}
         verdicts={store.snapshot.verdicts}
         watchItems={store.snapshot.watchItems}
+        forecasts={store.snapshot.forecasts}
         onDownload={(filename, content, mime) => store.downloadFile(filename, content, mime)}
         onClose={() => setDoctorFileOpen(false)}
       />

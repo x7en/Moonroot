@@ -481,3 +481,119 @@ textarea {
   color: var(--lamp-text);
 }
 
+.confidence-hero {
+  font-family: var(--font-display);
+  font-size: 2.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--accent);
+  margin: 4px 0;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-bottom: 4px;
+}
+
+.calendar-day {
+  min-height: 48px;
+  min-width: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-2);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  padding: 4px 2px;
+  font-size: 0.875rem;
+}
+
+.calendar-day-today {
+  border: 2px solid var(--lamp);
+}
+
+.calendar-day-likely {
+  border-color: var(--accent);
+  background-color: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.calendar-day-possible {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+
+.calendar-day-flow {
+  border-color: var(--flow);
+}
+
+.calendar-day[aria-pressed='true'] {
+  outline: 2px solid var(--lamp);
+  outline-offset: 1px;
+}
+
+.calendar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background-color: var(--flow);
+}
+
+.calendar-dot-spot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 2px solid var(--flow);
+}
+
+.forecast-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.ribbon-cell {
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-2);
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+}
+
+.ribbon-cell-likely {
+  background-color: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+  font-weight: 700;
+}
+
+.ribbon-cell-possible {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+
+.ribbon-cell-today {
+  border: 2px solid var(--lamp);
+  font-weight: 700;
+}
+
+

@@ -16,6 +16,11 @@ import {
   type StandingFlagId,
   type Verdict,
 } from '../core/model/types';
+import {
+  computeLivePrediction,
+  reconcileForecasts,
+  type CycleWindowResult,
+} from '../core/predict/forecast';
 import { getCatchUpDays } from '../core/triage/catchUp';
 import { evaluateTriage, type TriageEvaluationResult } from '../core/triage/engine';
 import { getActiveQuestionFlows } from '../core/triage/flowEngine';
@@ -185,6 +190,28 @@ export function computeStep2Snapshot(
   };
 }
 
+export function computeStep3Snapshot(
+  snapshot: AppSnapshotData,
+  selectedDate: DateKey,
+  today: DateKey,
+  nowIso: Stamp,
+) {
+  const step2 = computeStep2Snapshot(snapshot, selectedDate, today, nowIso);
+  const profile = snapshot.profile ?? makeDefaultProfile(nowIso);
+  const prediction: CycleWindowResult = computeLivePrediction({
+    today,
+    profile,
+    cycles: step2.cycles,
+    dayLogs: snapshot.dayLogs,
+    decisions: snapshot.decisions,
+    existingForecasts: snapshot.forecasts,
+  });
+  return {
+    ...step2,
+    prediction,
+  };
+}
+
 export class MoonrootStore {
   readonly storage: IndexedDBStorage;
   snapshot: AppSnapshotData;
@@ -216,6 +243,9 @@ export class MoonrootStore {
   async init(): Promise<void> {
     this.snapshot = await this.storage.exportAll();
     this.locked = this.snapshot.profile?.lock.type === 'pin';
+    if (this.snapshot.profile && !this.locked) {
+      await this.syncForecasts();
+    }
   }
 
   async unlockWithPin(pin: string): Promise<boolean> {
@@ -227,6 +257,7 @@ export class MoonrootStore {
     const ok = await verifyPin(pin, lock);
     if (ok) {
       this.locked = false;
+      await this.syncForecasts();
     }
     return ok;
   }
@@ -234,6 +265,7 @@ export class MoonrootStore {
   async saveProfile(profile: Profile): Promise<void> {
     await this.storage.saveProfile(profile);
     this.snapshot = { ...this.snapshot, profile };
+    await this.syncForecasts();
   }
 
   async setPin(pin: string | null): Promise<void> {
@@ -349,6 +381,77 @@ export class MoonrootStore {
     }
   }
 
+  async syncForecasts(today: DateKey = getLocalDateKey()): Promise<void> {
+    const profile = this.snapshot.profile;
+    if (!profile) return;
+
+    const episodes = classifyEpisodes(this.snapshot.dayLogs, this.snapshot.decisions, today);
+    const cycles = deriveCycles(episodes, this.snapshot.decisions, today);
+    const rec = reconcileForecasts({
+      today,
+      profile,
+      cycles,
+      dayLogs: this.snapshot.dayLogs,
+      decisions: this.snapshot.decisions,
+      existingForecasts: this.snapshot.forecasts,
+    });
+
+    if (rec.changed) {
+      const prevById = new Map(this.snapshot.forecasts.map((f) => [f.id, f]));
+      for (const f of rec.forecasts) {
+        const prev = prevById.get(f.id);
+        if (!prev || JSON.stringify(prev) !== JSON.stringify(f)) {
+          await this.storage.saveForecast(f);
+        }
+      }
+      this.snapshot = {
+        ...this.snapshot,
+        forecasts: rec.forecasts,
+      };
+    }
+  }
+
+  async saveApproximatePeriod(
+    startDate: DateKey,
+    durationDays = 4,
+    nowIso: Stamp = getLocalStamp(),
+  ): Promise<number> {
+    const count = Math.max(1, Math.min(10, Math.round(durationDays)));
+    const existingByDate = new Map(this.snapshot.dayLogs.map((l) => [l.date, l]));
+    let added = 0;
+
+    for (let i = 0; i < count; i += 1) {
+      const date = addDays(startDate, i);
+      const existing = existingByDate.get(date);
+      if (existing && existing.filledFrom !== 'approximate' && existing.flow !== null) {
+        continue;
+      }
+      const entry: DayLog = {
+        date,
+        filledFrom: 'approximate',
+        flow: i === 0 || i === 1 ? 'medium' : 'light',
+        symptoms: existing?.symptoms ?? [],
+        danger: existing?.danger ?? [],
+        dangerAnswered: true,
+        note: existing?.note ?? '',
+        updatedAt: nowIso,
+      };
+      await this.storage.saveDayLog(entry);
+      existingByDate.set(date, entry);
+      added += 1;
+    }
+
+    if (added > 0) {
+      this.snapshot = {
+        ...this.snapshot,
+        dayLogs: [...existingByDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
+      };
+      await this.syncTriageState(getLocalDateKey(), nowIso);
+      await this.syncForecasts(getLocalDateKey());
+    }
+    return added;
+  }
+
   async saveDayLog(log: DayLog): Promise<DayLog | null> {
     const previous = this.getDayLog(log.date);
     await this.storage.saveDayLog(log);
@@ -358,6 +461,7 @@ export class MoonrootStore {
       dayLogs: [...others, log].sort((a, b) => a.date.localeCompare(b.date)),
     };
     await this.syncTriageState(getLocalDateKey(), log.updatedAt);
+    await this.syncForecasts(getLocalDateKey());
     return previous;
   }
 
@@ -371,6 +475,7 @@ export class MoonrootStore {
         dayLogs: this.snapshot.dayLogs.filter((d) => d.date !== date),
       };
       await this.syncTriageState();
+      await this.syncForecasts();
     }
   }
 
@@ -381,6 +486,7 @@ export class MoonrootStore {
       dayLogs: this.snapshot.dayLogs.filter((d) => d.date !== date),
     };
     await this.syncTriageState();
+    await this.syncForecasts();
   }
 
   async saveDecision(decision: Decision): Promise<void> {
@@ -391,6 +497,7 @@ export class MoonrootStore {
       decisions: [...others, decision].sort((a, b) => a.date.localeCompare(b.date)),
     };
     await this.syncTriageState(getLocalDateKey(), decision.at);
+    await this.syncForecasts(getLocalDateKey());
   }
 
   async deleteDecision(id: string): Promise<void> {
@@ -400,6 +507,7 @@ export class MoonrootStore {
       decisions: this.snapshot.decisions.filter((d) => d.id !== id),
     };
     await this.syncTriageState();
+    await this.syncForecasts();
   }
 
   async dismissEventCard(verdictId: string, nowIso: Stamp = getLocalStamp()): Promise<void> {
@@ -529,6 +637,7 @@ export class MoonrootStore {
     this.snapshot = restored;
     this.locked = false;
     await this.syncTriageState();
+    await this.syncForecasts();
     return restored;
   }
 

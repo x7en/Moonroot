@@ -135,5 +135,14 @@
       "dischargeStillThere": "Is the discharge still there?"
     }
   },
-  "catchUpPrompt": "Welcome back. Want a 20-second catch-up?"
+  "catchUpPrompt": "Welcome back. Want a 20-second catch-up?",
+  "cycle": {
+    "confidenceLabel": "Confidence",
+    "likelyWidthCaption": "likely window {days} days wide",
+    "measuredCount": "Past possible windows held the real start in {hits} of the last {total}.",
+    "highVariabilityNote": "Your cycles vary a lot, so ranges stay wide. That limit comes from the cycles, not from how you log.",
+    "leadInRetired": "This pattern is not holding.",
+    "noCyclesYet": "Log your first period to start.",
+    "emptyHint": "Your ranges, confidence meter, and patterns unlock as you log periods."
+  }
 }

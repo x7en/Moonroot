@@ -5,11 +5,13 @@ import type {
   DayLog,
   Decision,
   DoctorVisit,
+  Forecast,
   MedicineEntry,
   Profile,
   Verdict,
   WatchItem,
 } from '../../core/model/types';
+import { buildCycleTableCsv, buildDayTableCsv } from '../../core/report/csv';
 import {
   buildDoctorFile,
   type DoctorFileFormat,
@@ -27,6 +29,7 @@ interface DoctorFileSheetProps {
   decisions?: readonly Decision[];
   verdicts?: readonly Verdict[];
   watchItems?: readonly WatchItem[];
+  forecasts?: readonly Forecast[];
   onDownload: (filename: string, content: string, mimeType: string) => void;
   onClose: () => void;
 }
@@ -42,6 +45,7 @@ export function DoctorFileSheet({
   decisions = [],
   verdicts = [],
   watchItems = [],
+  forecasts = [],
   onDownload,
   onClose,
 }: DoctorFileSheetProps) {
@@ -65,6 +69,7 @@ export function DoctorFileSheet({
         decisions,
         verdicts,
         watchItems,
+        forecasts,
         options: {
           range,
           format,
@@ -84,6 +89,7 @@ export function DoctorFileSheet({
       decisions,
       verdicts,
       watchItems,
+      forecasts,
       range,
       format,
       includeNotes,
@@ -93,6 +99,29 @@ export function DoctorFileSheet({
       worryNote,
       under18,
     ],
+  );
+
+  const dayCsv = useMemo(
+    () =>
+      buildDayTableCsv({
+        today,
+        dayLogs,
+        medicines,
+        range,
+        includeNotes,
+        includeMedicines,
+      }),
+    [today, dayLogs, medicines, range, includeNotes, includeMedicines],
+  );
+
+  const cycleCsv = useMemo(
+    () =>
+      buildCycleTableCsv({
+        today,
+        dayLogs,
+        decisions,
+      }),
+    [today, dayLogs, decisions],
   );
 
   if (!open) return null;
@@ -232,6 +261,27 @@ export function DoctorFileSheet({
         >
           Save {output.filename}
         </button>
+
+        <div class="btn-row" style={{ marginTop: '10px' }}>
+          <button
+            type="button"
+            class="btn btn-small"
+            style={{ flex: '1 1 160px' }}
+            onClick={() => onDownload(dayCsv.filename, dayCsv.content, 'text/csv;charset=utf-8')}
+          >
+            Download Day table (.csv)
+          </button>
+          <button
+            type="button"
+            class="btn btn-small"
+            style={{ flex: '1 1 160px' }}
+            onClick={() =>
+              onDownload(cycleCsv.filename, cycleCsv.content, 'text/csv;charset=utf-8')
+            }
+          >
+            Download Cycle table (.csv)
+          </button>
+        </div>
       </div>
     </div>
   );
