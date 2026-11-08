@@ -1,0 +1,303 @@
+import { useEffect, useRef, useState } from 'preact/hooks';
+import {
+  getRegionEmergencyInfo,
+  makeDefaultProfile,
+  MoonrootStore,
+} from '../app/store';
+import { isUnder18 } from '../core/model/dates';
+import type { DateKey, DayLog, DoctorVisit, MedicineEntry, Profile } from '../core/model/types';
+import { getLocalDateKey, getLocalStamp } from '../platform/web';
+import { DoctorFileSheet } from './components/DoctorFileSheet';
+import { GetHelpSheet } from './components/GetHelpSheet';
+import { OnboardingScreen } from './screens/OnboardingScreen';
+import { PinLockScreen } from './screens/PinLockScreen';
+import { RecordScreen } from './screens/RecordScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
+import { TodayScreen } from './screens/TodayScreen';
+
+type Tab = 'today' | 'record' | 'settings';
+
+interface UndoState {
+  date: DateKey;
+  previous: DayLog | null;
+}
+
+export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
+  const [store] = useState(() => initialStore ?? new MoonrootStore());
+  const [ready, setReady] = useState(false);
+  const [tick, setTick] = useState(0);
+  const [tab, setTab] = useState<Tab>('today');
+  const [selectedDate, setSelectedDate] = useState<DateKey>(() => getLocalDateKey());
+  const [getHelpOpen, setGetHelpOpen] = useState(false);
+  const [doctorFileOpen, setDoctorFileOpen] = useState(false);
+  const [undoState, setUndoState] = useState<UndoState | null>(null);
+  const undoTimerRef = useRef<number | null>(null);
+
+  const today = getLocalDateKey();
+  const nowIso = getLocalStamp();
+  const refresh = () => setTick((t) => t + 1);
+
+  useEffect(() => {
+    let active = true;
+    void store.init().then(() => {
+      if (active) {
+        setReady(true);
+        refresh();
+      }
+    });
+    return () => {
+      active = false;
+      if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);
+    };
+  }, [store]);
+
+  const profile = store.snapshot.profile;
+  const activeTheme = profile?.theme ?? 'dusk';
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', activeTheme);
+  }, [activeTheme]);
+
+  if (!ready) {
+    return (
+      <main class="app-shell">
+        <div class="card">
+          <p style={{ margin: 0 }}>Loading Moonroot...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (store.locked) {
+    return (
+      <PinLockScreen
+        onUnlock={async (pin) => {
+          const ok = await store.unlockWithPin(pin);
+          refresh();
+          return ok;
+        }}
+      />
+    );
+  }
+
+  if (!profile || !profile.disclaimerAcceptedAt) {
+    return (
+      <div class="app-shell">
+        <header class="top-bar">
+          <h1 class="brand-title">Moonroot</h1>
+          <button type="button" class="btn btn-help" onClick={() => setGetHelpOpen(true)}>
+            Get help
+          </button>
+        </header>
+        <OnboardingScreen
+          today={today}
+          nowIso={nowIso}
+          onComplete={async (nextProfile) => {
+            await store.saveProfile(nextProfile);
+            refresh();
+          }}
+        />
+        <GetHelpSheet
+          open={getHelpOpen}
+          under18={true}
+          regionInfo={getRegionEmergencyInfo('PK')}
+          onClose={() => setGetHelpOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  const under18 = isUnder18(profile, today);
+  const regionInfo = getRegionEmergencyInfo(profile.region);
+
+  async function handleSaveDayLog(log: DayLog): Promise<void> {
+    const prev = await store.saveDayLog(log);
+    refresh();
+    setUndoState({ date: log.date, previous: prev });
+    if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = window.setTimeout(() => {
+      setUndoState(null);
+    }, 5000);
+  }
+
+  async function handleUndo(): Promise<void> {
+    if (!undoState) return;
+    await store.restorePreviousDayLog(undoState.date, undoState.previous);
+    setUndoState(null);
+    refresh();
+  }
+
+  async function handleSaveProfile(next: Profile): Promise<void> {
+    await store.saveProfile(next);
+    refresh();
+  }
+
+  return (
+    <div class="app-shell" data-tick={tick}>
+      <header class="top-bar">
+        <h1 class="brand-title">Moonroot</h1>
+        <div class="top-actions">
+          <button type="button" class="btn btn-help" onClick={() => setGetHelpOpen(true)}>
+            Get help
+          </button>
+          {profile.lock.type === 'pin' && (
+            <button
+              type="button"
+              class="btn btn-small"
+              onClick={() => {
+                setTab('today');
+                store.locked = true;
+                refresh();
+              }}
+            >
+              Lock
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main>
+        {tab === 'today' && (
+          <TodayScreen
+            today={today}
+            selectedDate={selectedDate}
+            nowIso={nowIso}
+            profile={profile}
+            dayLog={store.getDayLog(selectedDate)}
+            medicines={store.snapshot.medicines}
+            onChangeDate={(date) => setSelectedDate(date)}
+            onSaveDayLog={handleSaveDayLog}
+            onSaveMedicine={async (entry: MedicineEntry) => {
+              await store.saveMedicine(entry);
+              refresh();
+            }}
+            onOpenGetHelp={() => setGetHelpOpen(true)}
+          />
+        )}
+
+        {tab === 'record' && (
+          <RecordScreen
+            today={today}
+            dayLogs={store.snapshot.dayLogs}
+            medicines={store.snapshot.medicines}
+            visits={store.snapshot.visits}
+            meta={store.snapshot.meta}
+            onEditDay={(date) => {
+              setSelectedDate(date);
+              setTab('today');
+            }}
+            onDeleteMedicine={async (id) => {
+              await store.deleteMedicine(id);
+              refresh();
+            }}
+            onSaveVisit={async (visit: DoctorVisit) => {
+              await store.saveVisit(visit);
+              refresh();
+            }}
+            onOpenDoctorFile={() => setDoctorFileOpen(true)}
+            onQuickExportBackup={() => setTab('settings')}
+            onSnoozeBackup={async () => {
+              await store.snoozeBackupNudge();
+              refresh();
+            }}
+          />
+        )}
+
+        {tab === 'settings' && (
+          <SettingsScreen
+            today={today}
+            profile={profile}
+            onSaveProfile={handleSaveProfile}
+            onSetPin={async (pin) => {
+              await store.setPin(pin);
+              refresh();
+            }}
+            onExportBackup={(passphrase) => store.exportBackup(passphrase)}
+            onInspectBackup={(raw) => store.inspectBackup(raw)}
+            onRestoreBackup={async (raw, passphrase) => {
+              await store.restoreBackup(raw, passphrase);
+              refresh();
+            }}
+            onDownloadFile={(filename, content, mime) =>
+              store.downloadFile(filename, content, mime)
+            }
+            onDeleteAll={async () => {
+              await store.deleteAllData();
+              setSelectedDate(today);
+              setTab('today');
+              refresh();
+            }}
+          />
+        )}
+      </main>
+
+      {undoState && (
+        <div class="toast" role="status" aria-live="polite">
+          <span>Saved {undoState.date}.</span>
+          <button type="button" class="btn btn-small" onClick={() => void handleUndo()}>
+            Undo
+          </button>
+        </div>
+      )}
+
+      <nav class="bottom-nav" aria-label="Main navigation">
+        <div class="bottom-nav-inner">
+          <button
+            type="button"
+            class="nav-tab"
+            aria-current={tab === 'today' ? 'page' : undefined}
+            onClick={() => setTab('today')}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            class="nav-log-fab"
+            aria-label="Log today"
+            onClick={() => {
+              setSelectedDate(today);
+              setTab('today');
+            }}
+          >
+            Log
+          </button>
+          <button
+            type="button"
+            class="nav-tab"
+            aria-current={tab === 'record' ? 'page' : undefined}
+            onClick={() => setTab('record')}
+          >
+            Record
+          </button>
+          <button
+            type="button"
+            class="nav-tab"
+            aria-current={tab === 'settings' ? 'page' : undefined}
+            onClick={() => setTab('settings')}
+          >
+            Settings
+          </button>
+        </div>
+      </nav>
+
+      <GetHelpSheet
+        open={getHelpOpen}
+        under18={under18}
+        regionInfo={regionInfo}
+        onClose={() => setGetHelpOpen(false)}
+      />
+
+      <DoctorFileSheet
+        open={doctorFileOpen}
+        today={today}
+        under18={under18}
+        profile={profile ?? makeDefaultProfile(nowIso)}
+        dayLogs={store.snapshot.dayLogs}
+        medicines={store.snapshot.medicines}
+        visits={store.snapshot.visits}
+        onDownload={(filename, content, mime) => store.downloadFile(filename, content, mime)}
+        onClose={() => setDoctorFileOpen(false)}
+      />
+    </div>
+  );
+}

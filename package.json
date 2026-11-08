@@ -4,14 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite",
+    "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.core.json --noEmit && tsc -p tsconfig.json --noEmit",
     "lint:eslint": "eslint .",
-    "lint:deps": "depcruise --config .dependency-cruiser.cjs core data scripts tests",
+    "lint:deps": "depcruise --config .dependency-cruiser.cjs core data app platform ui scripts tests",
     "lint:copy": "tsx scripts/lint-copy.ts",
     "lint": "npm run lint:eslint && npm run lint:deps && npm run lint:copy",
     "test": "vitest run",
     "rules:export": "tsx scripts/export-rules.ts",
-    "build": "tsc -p tsconfig.build.json"
+    "build:core": "tsc -p tsconfig.build.json",
+    "build": "npm run build:core && vite build"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
