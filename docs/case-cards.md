@@ -1,6 +1,6 @@
 # Moonroot Patient Case Cards
 
-- **Total cards**: 38
+- **Total cards**: 42
 - **Ruleset version**: 1.0 (**UNREVIEWED**)
 - **Source**: Generated from `core/triage/caseCards.ts` via `npm run rules:export`. The same cards execute as tests in Step 2 so the review packet and engine cannot drift apart.
 
@@ -317,4 +317,39 @@
 - **Answers logged**: Flow: none · Pain: 0/10 · Open event cards: 1
 - **App verdict**: `open-event-notice` · **Rules**: `None`
 - **Display / clinical notes**: Replaces Green with "Nothing new today. An earlier flag is still open."
+- **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________
+
+## CASE-39: ORG-14 clinical-review gap: Non-sudden pain 8/10 with dizziness and no medicine tried
+
+- **Category**: below-threshold
+- **Patient scenario**: Age 21. Flow=none, pain=8/10 (not sudden), reliefHelped=none-taken, and ticked Dizzy on danger screen. ORG-14 stops at 7 and RED-03/RED-08 do not fire.
+- **Answers logged**: Flow: none · Pain: 8/10, not sudden · Relief helped: none-taken · Danger sign: dizzy
+- **App verdict**: `green` · **Rules**: `GRN-01`
+- **Display / clinical notes**: UNREVIEWED GAP: Should pain 8 to 10 with dizziness, nausea or looking very pale be orange or red when it is not sudden and pain relief has not failed?
+- **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________
+
+## CASE-40: dangerAnswered answered None of these (heavy flow, danger=[], dangerAnswered=true)
+
+- **Category**: safety-guardrail
+- **Patient scenario**: Age 21. Heavy flow (no flooding/clots), pain 2/10, tapped None of these on danger screen.
+- **Answers logged**: Flow: heavy · Pain: 2/10 · Danger screen: answered None of these
+- **App verdict**: `green` · **Rules**: `GRN-01`
+- **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________
+
+## CASE-41: dangerAnswered missing in restored backup (heavy flow, danger=[], dangerAnswered=undefined)
+
+- **Category**: safety-guardrail
+- **Patient scenario**: Age 21. Heavy flow restored from a backup where dangerAnswered is missing/undefined.
+- **Answers logged**: Flow: heavy · Pain: 2/10 · Danger screen: dangerAnswered missing
+- **App verdict**: `incomplete` · **Rules**: `None`
+- **Display / clinical notes**: Never treats empty danger: [] as None of these without dangerAnswered=true
+- **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________
+
+## CASE-42: Law 4 missing required answer: pain is undefined
+
+- **Category**: safety-guardrail
+- **Patient scenario**: Age 21. Tapped light flow only and left pain unanswered.
+- **Answers logged**: Flow: light · Pain: unanswered
+- **App verdict**: `incomplete` · **Rules**: `None`
+- **Display / clinical notes**: Shows "Answer 1 more question to see a result"; never shows Green
 - **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________

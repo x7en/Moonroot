@@ -14,7 +14,7 @@ Every row below is marked **unreviewed** until a clinician (or a senior medical 
 4. **YEL-02 & YEL-08 Law 1 monotonicity fix**: **unreviewed (`Std`)** — Base yellow rules remain active when non-red warning signs or sub-threshold fever are logged so adding a sign never drops Yellow to Green.
 5. **ORG-12 stool blood field**: **unreviewed (`Std`)** — Step 2 reads `DayLog.stoolBlood`; fires only on `back-passage`, ignores `period`, and leaves `unsure` unresolved for follow-up.
 6. **Open clinical questions flagged during design freeze**:
-   - `ORG-14` stops at pain `4–7`, while `RED-03` requires `sudden === true` and `RED-08` requires failed pain medicine; confirm how non-sudden pain `8–10` with `dizzy`/`nausea`/`very-pale` and no medicine tried should be classified.
+   - `ORG-14` gap (`CASE-39`): *"Should pain 8 to 10 with dizziness, nausea or looking very pale be orange or red when it is not sudden and pain relief has not failed?"* (Kept strictly at 4–7 until clinician review.)
    - Confirm whether `RED-06` should remain `tampon` and `cup` only, or also include menstrual `disc`.
    - Confirm whether `ORG-01` becomes Red above a specific bleeding day count.
 

@@ -2001,6 +2001,28 @@ export const RULES_TABLE: readonly TriageRuleDefinition[] = [
         },
         expectedFires: false,
       },
+      {
+        id: 'GRN-01-below-undefined-danger',
+        kind: 'below-threshold',
+        label: 'Blocked when dangerAnswered is undefined (e.g. restored backup missing the field)',
+        input: {
+          today: BASE_DATE,
+          dayLog: { flow: 'heavy', pain: { level: 2, sites: [] }, danger: [] },
+          derived: { openEventCount: 0 },
+        },
+        expectedFires: false,
+      },
+      {
+        id: 'GRN-01-below-missing-pain',
+        kind: 'below-threshold',
+        label: 'Law 4: blocked when pain is unanswered on today',
+        input: {
+          today: BASE_DATE,
+          dayLog: { flow: 'light', danger: [], dangerAnswered: true },
+          derived: { openEventCount: 0 },
+        },
+        expectedFires: false,
+      },
     ],
   },
   {
