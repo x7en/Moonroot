@@ -1,14 +1,22 @@
+import { deriveCycles } from '../cycles/cycles';
+import { classifyEpisodes } from '../cycles/episodes';
 import { summarizeMedicinesForRange } from '../medicine/totals';
 import { SYMPTOM_CATALOGUE } from '../model/catalogues';
 import { addDays, diffDays, isUnder18, parseDateKey } from '../model/dates';
 import {
   RULESET_VERSION,
+  SCHEMA_VERSION,
   type DateKey,
   type DayLog,
+  type Decision,
   type DoctorVisit,
   type MedicineEntry,
   type Profile,
+  type RuleId,
+  type Verdict,
+  type WatchItem,
 } from '../model/types';
+import { evaluateTriage } from '../triage/engine';
 
 export type DoctorFileRange = '3m' | '6m' | '12m' | 'all';
 export type DoctorFileFormat = 'md' | 'txt';
@@ -19,6 +27,7 @@ export interface DoctorFileOptions {
   includeNotes: boolean;
   includeMedicines: boolean;
   includeIntimacy: boolean;
+  includeVerdicts?: boolean;
   worryNote?: string;
 }
 
@@ -29,6 +38,9 @@ export interface DoctorFileInput {
   dayLogs: readonly DayLog[];
   medicines: readonly MedicineEntry[];
   visits: readonly DoctorVisit[];
+  decisions?: readonly Decision[];
+  verdicts?: readonly Verdict[];
+  watchItems?: readonly WatchItem[];
   options: DoctorFileOptions;
 }
 
@@ -71,15 +83,58 @@ function heading(text: string, format: DoctorFileFormat, level: 1 | 2 = 2): stri
   return `${text}\n${underline}`;
 }
 
+function fallbackMinorProfile(today: DateKey): Profile {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    createdAt: `${today}T00:00:00Z`,
+    birthYear: null,
+    menarcheAge: null,
+    selfRegularity: 'unknown',
+    lastPeriodApprox: null,
+    onHormones: null,
+    contraception: null,
+    sexualHealthQuestions: 'off',
+    intimacy: 'none',
+    conditionsNote: '',
+    medicationsNote: '',
+    sproutName: null,
+    theme: 'dusk',
+    units: { temperature: 'C', water: 'ml' },
+    reminders: {
+      daily: { on: false, time: '20:00' },
+      watchlist: true,
+      quietFrom: '22:00',
+      quietTo: '08:00',
+    },
+    discreetMode: true,
+    lock: { type: 'none' },
+    locale: 'en',
+    region: 'PK',
+    disclaimerAcceptedAt: null,
+  };
+}
+
 /**
- * Step 1 doctor summary builder:
- * Generates Parts 2, 5 (whole range), 10, 12, the plain Daily log table (last 3 months),
- * footer, and machine-readable JSON block.
- * Parts belonging to Steps 2-4 (1, 3, 4, 6, 7, 8, 9, 11) are left out without comment.
+ * Step 2 doctor summary builder:
+ * Generates Parts 1, 2, 3, 4, 5 (whole range + per period), 7, 10, 11, 12,
+ * the plain Daily log table (last 3 months), footer, and machine-readable JSON block.
+ * Parts belonging to Steps 3-4 (6, 8, 9) are left out without comment.
  */
 export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
-  const { today, appVersion, profile, dayLogs, medicines, visits, options } = input;
+  const {
+    today,
+    appVersion,
+    profile,
+    dayLogs,
+    medicines,
+    visits,
+    decisions = [],
+    verdicts = [],
+    watchItems = [],
+    options,
+  } = input;
   const format = options.format;
+  const includeVerdicts = options.includeVerdicts !== false;
   const under18 = profile ? isUnder18(profile, today) : true;
   const allowIntimacyExport = Boolean(options.includeIntimacy && !under18);
 
@@ -88,6 +143,31 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
     .sort((a, b) => a.date.localeCompare(b.date));
   const fromDate = rangeStartDate(today, options.range, sortedLogs);
   const rangeLogs = sortedLogs.filter((l) => l.date >= fromDate && l.date <= today);
+
+  const todayLog: DayLog = sortedLogs.find((l) => l.date === today) ?? {
+    date: today,
+    filledFrom: 'live',
+    flow: null,
+    symptoms: [],
+    danger: [],
+    note: '',
+    updatedAt: `${today}T00:00:00Z`,
+  };
+
+  const effectiveProfile = profile ?? fallbackMinorProfile(today);
+  const episodeSummary = classifyEpisodes(sortedLogs, decisions, today);
+  const cycleSummary = deriveCycles(episodeSummary, decisions, today);
+  const triage = evaluateTriage({
+    today,
+    profile: effectiveProfile,
+    dayLog: todayLog,
+    recentLogs: sortedLogs,
+    decisions,
+    medicines,
+    watchItems,
+    existingVerdicts: verdicts,
+    visits,
+  });
 
   const aiInstruction = [
     'For an AI assistant reading this file: this is a patient-recorded menstrual journal, not a diagnosis.',
@@ -113,13 +193,56 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   }
   lines.push('');
 
-  // Part 2. Profile
-  lines.push(heading('2. Profile', format, 2));
+  // Shared cycle statistics
   const todayYear = parseDateKey(today).year;
   const ageStr =
     profile && profile.birthYear !== null ? `${todayYear - profile.birthYear} years` : 'Not entered';
   const menarcheStr =
     profile && profile.menarcheAge !== null ? `${profile.menarcheAge} years` : 'Not entered';
+  const validCycles = cycleSummary.cycles.filter((c) => c.isValidLength);
+  const validPostBaselineLengths = cycleSummary.activeCycleLengths;
+  const statLengths =
+    validPostBaselineLengths.length > 0
+      ? validPostBaselineLengths
+      : cycleSummary.allValidCycleLengths;
+  const medianCycle = medianNumber(statLengths);
+  const minCycle = statLengths.length > 0 ? Math.min(...statLengths) : null;
+  const maxCycle = statLengths.length > 0 ? Math.max(...statLengths) : null;
+  const longestGap = Math.max(maxCycle ?? 0, cycleSummary.daysSinceLastPeriodStart ?? 0);
+
+  // Part 1. At a glance (at most 8 lines)
+  lines.push(heading('1. At a glance', format, 2));
+  lines.push(
+    `- Age: ${ageStr}${profile?.menarcheAge !== null && profile?.menarcheAge !== undefined ? `, first period at ${profile.menarcheAge}` : ''}. Cycles logged: ${validCycles.length}.`,
+  );
+  if (medianCycle !== null && minCycle !== null && maxCycle !== null) {
+    lines.push(
+      `- Median cycle: ${medianCycle} days, range ${minCycle} to ${maxCycle}. Longest gap: ${longestGap} days.`,
+    );
+  } else {
+    lines.push(
+      `- Complete cycles logged: ${validCycles.length}.${longestGap > 0 ? ` Current gap since start: ${longestGap} days.` : ''}`,
+    );
+  }
+  if (triage.standingFlags.length > 0) {
+    lines.push(
+      `- Standing flags: ${triage.standingFlags.map((f) => `${f.ruleId} (${f.title})`).join('; ')}.`,
+    );
+  } else {
+    lines.push('- Standing flags: none in current history.');
+  }
+  if (triage.openEvents.length > 0) {
+    lines.push(
+      `- Open event flags: ${triage.openEvents.map((e) => `${e.ruleIds.join(', ')} (${e.triggerKey?.split(':')[1] ?? e.at.slice(0, 10)})`).join(', ')}.`,
+    );
+  }
+  if (options.worryNote && options.worryNote.trim()) {
+    lines.push(`- In her words: "${options.worryNote.trim()}"`);
+  }
+  lines.push('');
+
+  // Part 2. Profile
+  lines.push(heading('2. Profile', format, 2));
   const hormoneStr =
     profile?.onHormones === true
       ? 'Yes'
@@ -130,7 +253,9 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   lines.push(`- Age: ${ageStr}`);
   lines.push(`- Age at first period: ${menarcheStr}`);
   lines.push(`- Self-described cycle regularity: ${profile?.selfRegularity ?? 'unknown'}`);
-  lines.push(`- Last period noted at onboarding (approximate): ${profile?.lastPeriodApprox ?? 'Not entered'}`);
+  lines.push(
+    `- Last period noted at onboarding (approximate): ${profile?.lastPeriodApprox ?? 'Not entered'}`,
+  );
   lines.push(`- Hormone medicine: ${hormoneStr}`);
   if (allowIntimacyExport && profile) {
     lines.push(`- Contraception recorded: ${profile.contraception ?? 'Not entered'}`);
@@ -141,7 +266,97 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   }
   lines.push('');
 
-  // Part 5. Pain and symptoms (Step 1 whole-range summary)
+  // Part 3. Cycle history (up to last 12 cycles + ongoing open cycle)
+  lines.push(heading('3. Cycle history', format, 2));
+  const recentCycles = cycleSummary.cycles.slice(-12).reverse();
+  const openCycle = cycleSummary.openCycle;
+
+  if (recentCycles.length === 0 && !openCycle) {
+    lines.push('- Not enough period starts logged yet to build a cycle table.');
+  } else {
+    if (format === 'md') {
+      lines.push('| Start | Length (days) | Bleeding days | Heaviest flow | Spotting before flow |');
+      lines.push('| --- | --- | --- | --- | --- |');
+    }
+    if (openCycle) {
+      const lengthLabel = `open (day ${openCycle.daysSinceStart})`;
+      const leadStr =
+        openCycle.episode.leadInDays > 0 ? `${openCycle.episode.leadInDays} day(s)` : 'none';
+      if (format === 'md') {
+        lines.push(
+          `| ${openCycle.startDate} | ${lengthLabel} | ${openCycle.episode.knownBleedingDays} | ${openCycle.episode.heaviestFlow} | ${leadStr} |`,
+        );
+      } else {
+        lines.push(
+          `${openCycle.startDate} | length=${lengthLabel} | bleeding=${openCycle.episode.knownBleedingDays}d | heaviest=${openCycle.episode.heaviestFlow} | spotting_before=${leadStr}`,
+        );
+      }
+    }
+    for (const c of recentCycles) {
+      const flags: string[] = [];
+      if (c.beforeBaseline) flags.push('before the change');
+      if (c.dateCheckFlag) flags.push(c.dateCheckFlag);
+      if (c.ignoredInPredictions) flags.push('ignored');
+      if (c.approximate) flags.push('approx');
+      const flagSuffix = flags.length > 0 ? ` (${flags.join(', ')})` : '';
+      const leadStr = c.leadInDays > 0 ? `${c.leadInDays} day(s)` : 'none';
+      if (format === 'md') {
+        lines.push(
+          `| ${c.startDate} | ${c.lengthDays}${flagSuffix} | ${c.bleedingDays} | ${c.episode.heaviestFlow} | ${leadStr} |`,
+        );
+      } else {
+        lines.push(
+          `${c.startDate} | length=${c.lengthDays}${flagSuffix} | bleeding=${c.bleedingDays}d | heaviest=${c.episode.heaviestFlow} | spotting_before=${leadStr}`,
+        );
+      }
+    }
+  }
+  lines.push('');
+
+  // Part 4. Bleeding detail
+  lines.push(heading('4. Bleeding detail', format, 2));
+  const heavySignDays = rangeLogs.filter(
+    (l) =>
+      l.soakedPerHour === true ||
+      l.changeEvery === 'under-2h' ||
+      l.changeEvery === '2-3h' ||
+      l.doubleProtection === true ||
+      l.flooding === true ||
+      l.clots === 'small' ||
+      l.clots === 'large',
+  );
+  const prolongedPeriods = episodeSummary.periodEpisodes.filter(
+    (ep) => ep.endDate >= fromDate && ep.knownBleedingDays > 7,
+  );
+  const inBetweenInRange = episodeSummary.inBetweenSpotting.filter(
+    (s) => s.lastDate >= fromDate && s.lastDate <= today,
+  );
+  if (heavySignDays.length > 0) {
+    const soakedCount = heavySignDays.filter((l) => l.soakedPerHour === true).length;
+    const under2hCount = heavySignDays.filter((l) => l.changeEvery === 'under-2h').length;
+    const largeClotCount = heavySignDays.filter((l) => l.clots === 'large').length;
+    const floodingCount = heavySignDays.filter((l) => l.flooding === true).length;
+    lines.push(
+      `- Heavy-flow signs logged on ${heavySignDays.length} day(s) in range: hourly soaking=${soakedCount}, every 1-2h change=${under2hCount}, large clots=${largeClotCount}, flooding=${floodingCount}.`,
+    );
+  } else {
+    lines.push('- Heavy-flow signs (clots, flooding, frequent changes): none logged in range.');
+  }
+  lines.push(
+    `- Prolonged periods (> 7 known bleeding days): ${prolongedPeriods.length > 0 ? prolongedPeriods.map((p) => `${p.startDate} (${p.knownBleedingDays} days)`).join(', ') : 'none'}.`,
+  );
+  lines.push(
+    `- Between-period spotting events: ${inBetweenInRange.length > 0 ? inBetweenInRange.map((s) => `${s.firstDate} (${s.consecutiveDays}d)`).join(', ') : 'none'}.`,
+  );
+  if (allowIntimacyExport) {
+    const bleedingAfterSexDays = rangeLogs.filter((l) => l.intimacy?.bleedingAfter === true);
+    lines.push(
+      `- Bleeding after sex (included by preference): ${bleedingAfterSexDays.length} day(s)${bleedingAfterSexDays.length > 0 ? ` (${bleedingAfterSexDays.map((l) => l.date).join(', ')})` : ''}.`,
+    );
+  }
+  lines.push('');
+
+  // Part 5. Pain and symptoms (whole range + per period)
   lines.push(heading('5. Pain and symptoms', format, 2));
   const painScores = rangeLogs
     .map((l) => l.pain?.level)
@@ -155,6 +370,18 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
     );
   } else {
     lines.push('- Pain scores logged: none in this range.');
+  }
+
+  const periodsInRange = episodeSummary.periodEpisodes.filter(
+    (p) => p.endDate >= fromDate && p.startDate <= today,
+  );
+  if (periodsInRange.length > 0) {
+    lines.push('- Pain per period:');
+    for (const p of [...periodsInRange].reverse().slice(0, 12)) {
+      lines.push(
+        `  - Period starting ${p.startDate}: peak pain ${p.maxPain}/10, stopped normal activities=${p.anyStoppedActivities ? 'yes' : 'no'}, bleeding days=${p.knownBleedingDays}.`,
+      );
+    }
   }
 
   const symptomCounts = new Map<string, number>();
@@ -173,6 +400,59 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
     lines.push('- Symptoms logged: none in this range.');
   }
   lines.push('');
+
+  // Part 7. Flags raised (respects includeVerdicts toggle)
+  if (includeVerdicts) {
+    lines.push(heading('7. Flags raised', format, 2));
+    if (triage.standingFlags.length > 0) {
+      lines.push('- Standing history flags:');
+      for (const s of triage.standingFlags) {
+        lines.push(`  - ${s.ruleId}: ${s.title} — ${s.reason}`);
+      }
+    }
+
+    const storedEvents = verdicts.filter(
+      (v) => v.at.slice(0, 10) >= fromDate && v.at.slice(0, 10) <= today,
+    );
+    const eventRows: string[] = [];
+    const seenKeys = new Set<string>();
+
+    for (const v of storedEvents) {
+      const key = v.triggerKey ?? `${v.at}:${v.ruleIds.join(',')}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      const status = v.closedByVisit
+        ? `closed by doctor visit (${v.closedByVisit})`
+        : v.dismissedAt
+          ? `acknowledged (${v.dismissedAt.slice(0, 10)})`
+          : 'open / recorded';
+      eventRows.push(
+        `  - ${v.at.slice(0, 10)} [${v.level}] ${v.ruleIds.join(', ') || 'none'}: ${v.reasons.join(' ')} — ${status}.`,
+      );
+    }
+    for (const ev of triage.firedEventRules) {
+      if (seenKeys.has(ev.triggerKey)) continue;
+      seenKeys.add(ev.triggerKey);
+      const isClosedByVisit = visits.some((v) => v.date >= ev.triggerDate);
+      const status = isClosedByVisit ? 'doctor visit logged after trigger' : 'open';
+      eventRows.push(
+        `  - ${ev.triggerDate} [orange] ${ev.ruleId}: ${ev.reason} — ${status}.`,
+      );
+    }
+    if (triage.today.ruleIds.length > 0 && triage.today.level !== 'green') {
+      eventRows.push(
+        `  - ${today} [${triage.today.level}] ${triage.today.ruleIds.join(', ')}: ${triage.today.reasons.join(' ')} — active today.`,
+      );
+    }
+
+    if (eventRows.length > 0) {
+      lines.push('- Verdict and event log:');
+      lines.push(...eventRows);
+    } else {
+      lines.push('- Verdict and event flags: none raised in this range.');
+    }
+    lines.push('');
+  }
 
   // Part 10. Tests, medicines and visits
   lines.push(heading('10. Tests, medicines and visits', format, 2));
@@ -230,11 +510,140 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   }
   lines.push('');
 
+  // Part 11. Questions to ask (conditions named ONLY here as things to ask a doctor)
+  lines.push(heading('11. Questions to ask', format, 2));
+  const firedRuleSet = new Set<RuleId>([
+    ...triage.standingFlags.map((s) => s.ruleId),
+    ...triage.firedEventRules.map((e) => e.ruleId),
+    ...triage.firedTodayRules,
+    ...verdicts.flatMap((v) => v.ruleIds),
+  ]);
+  const questionsToAsk: string[] = [];
+
+  if (firedRuleSet.has('STD-01') || firedRuleSet.has('STD-02') || firedRuleSet.has('STD-03')) {
+    if (minCycle !== null && maxCycle !== null && minCycle !== maxCycle) {
+      questionsToAsk.push(
+        `My cycles range from ${minCycle} to ${maxCycle} days. What could explain that, and would any blood tests (for example thyroid and hormone levels) or an ultrasound help?`,
+      );
+    } else {
+      questionsToAsk.push(
+        'My cycle lengths or gaps vary. What could explain that, and would any blood tests (for example thyroid and hormone levels) or an ultrasound help?',
+      );
+    }
+  }
+  if (firedRuleSet.has('STD-04') || firedRuleSet.has('ORG-03')) {
+    questionsToAsk.push(
+      `I went ${longestGap} days without a period. Should anything be checked?`,
+    );
+  }
+  const hasProlongedWithAnemiaSigns =
+    firedRuleSet.has('ORG-01') &&
+    rangeLogs.some(
+      (l) =>
+        l.danger.includes('unusual-tiredness') ||
+        l.danger.includes('very-pale') ||
+        l.danger.includes('breathless-on-effort'),
+    );
+  if (firedRuleSet.has('ORG-02') || firedRuleSet.has('ORG-10') || hasProlongedWithAnemiaSigns) {
+    questionsToAsk.push(
+      'My periods are heavy. Could my iron be low, and should I have a blood count?',
+    );
+  }
+  if (firedRuleSet.has('ORG-09')) {
+    const painfulPeriods = periodsInRange.filter(
+      (p) => p.maxPain >= 7 || p.anyStoppedActivities,
+    );
+    const maxPeriodPain =
+      painfulPeriods.length > 0 ? Math.max(...painfulPeriods.map((p) => p.maxPain)) : 7;
+    questionsToAsk.push(
+      `My pain reached ${maxPeriodPain} out of 10 in ${Math.max(2, painfulPeriods.length)} periods. What could cause this, and what can help?`,
+    );
+  }
+  if (firedRuleSet.has('STD-06') || firedRuleSet.has('ORG-06') || firedRuleSet.has('ORG-07')) {
+    if (allowIntimacyExport || firedRuleSet.has('ORG-06')) {
+      questionsToAsk.push(
+        'I have bleeding between periods or after sex. Do I need an examination?',
+      );
+    } else {
+      questionsToAsk.push('I have bleeding between periods. Do I need an examination?');
+    }
+  }
+  const nonPeriodStoolDays = rangeLogs.filter(
+    (l) =>
+      l.stoolBlood === 'back-passage' &&
+      (l.flow === 'none' || l.flow === 'spotting' || l.flow === null),
+  ).length;
+  const allStoolDays = rangeLogs.filter((l) => l.stoolBlood === 'back-passage').length;
+  if (firedRuleSet.has('ORG-12') || nonPeriodStoolDays > 0 || allStoolDays > 2) {
+    questionsToAsk.push(
+      `I saw blood in my stool on ${Math.max(1, allStoolDays)} day(s). Should this be checked separately?`,
+    );
+  }
+  if (options.includeMedicines) {
+    const painMeds = medSummary.asNeeded.filter((item) =>
+      medicines.some(
+        (m) =>
+          m.kind === 'dose' &&
+          m.category === 'pain-relief' &&
+          m.date >= fromDate &&
+          m.date <= today &&
+          (m.genericName ?? m.nameShown) === (item.genericName ?? item.shownNames[0]),
+      ),
+    );
+    if (painMeds.length > 0) {
+      const names = painMeds.map((p) => p.shownNames.join(' / ')).join(', ');
+      const uniqueDays = new Set(
+        medicines
+          .filter(
+            (m) =>
+              m.kind === 'dose' &&
+              m.category === 'pain-relief' &&
+              m.date >= fromDate &&
+              m.date <= today,
+          )
+          .map((m) => m.date),
+      ).size;
+      questionsToAsk.push(
+        `I take ${names} for pain on ${uniqueDays} day(s). Is this the right medicine and amount for me, and is there anything better?`,
+      );
+    }
+
+    const changedHormones = medSummary.courses.filter((c) => {
+      const raw = medicines.find((m) => m.id === c.id);
+      if (!raw || raw.category !== 'hormone') return false;
+      return (
+        (c.startDate >= fromDate && c.startDate <= today) ||
+        (c.stopDate !== null && c.stopDate >= fromDate && c.stopDate <= today)
+      );
+    });
+    for (const h of changedHormones) {
+      const changeDate =
+        h.stopDate !== null && h.stopDate >= fromDate && h.stopDate <= today
+          ? h.stopDate
+          : h.startDate;
+      const actionVerb =
+        h.stopDate !== null && h.stopDate === changeDate ? 'stopped' : 'started';
+      questionsToAsk.push(
+        `I ${actionVerb} ${h.nameShown} on ${changeDate}. How should that change my cycles?`,
+      );
+    }
+  }
+
+  if (questionsToAsk.length > 0) {
+    for (const q of questionsToAsk) {
+      lines.push(`- "${q}"`);
+    }
+  } else {
+    lines.push('- No specific flag-triggered questions in this range.');
+  }
+  lines.push('');
+
   // Part 12. Data quality
   lines.push(heading('12. Data quality', format, 2));
   const daysCovered = Math.max(1, diffDays(fromDate, today) + 1);
   const approxCount = rangeLogs.filter((l) => l.filledFrom === 'approximate').length;
   const backfillCount = rangeLogs.filter((l) => l.filledFrom === 'backfill').length;
+  const checkDateCycles = cycleSummary.cycles.filter((c) => c.dateCheckFlag !== null).length;
   let gapDaysOver2 = 0;
   for (let i = 1; i < rangeLogs.length; i++) {
     const prev = rangeLogs[i - 1];
@@ -246,6 +655,9 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   lines.push(`- Days logged: ${rangeLogs.length} out of ${daysCovered} days in range.`);
   lines.push(`- Approximate entries: ${approxCount}. Backfilled entries: ${backfillCount}.`);
   lines.push(`- Multi-day gaps (2 or more unlogged days between logs): ${gapDaysOver2}.`);
+  if (checkDateCycles > 0) {
+    lines.push(`- Cycles flagged "check this date" (<10 or >200 days): ${checkDateCycles}.`);
+  }
   lines.push('');
 
   // Plain Daily log table of last 3 months
@@ -268,7 +680,9 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
     }
 
     if (format === 'md') {
-      lines.push('| Date | Flow | Protection | Clots | Pain | Symptoms | Danger signs | Medicines | Note |');
+      lines.push(
+        '| Date | Flow | Protection | Clots | Pain | Symptoms | Danger signs | Medicines | Note |',
+      );
       lines.push('| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
     }
 
@@ -321,7 +735,7 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   // Footer
   lines.push(heading('About this file', format, 2));
   lines.push(
-    `- Disclaimer: Moonroot is a private journal that records symptoms and sorts urgency. It does not diagnose any condition.`,
+    '- Disclaimer: Moonroot is a private journal that records symptoms and sorts urgency. It does not diagnose any condition.',
   );
   lines.push(
     `- Version: Moonroot ${appVersion} · rules ${RULESET_VERSION} · Clinician review: Not yet clinician reviewed`,
@@ -347,6 +761,19 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
             max: Math.max(...painScores),
           }
         : null,
+    cyclesSummary: {
+      validCyclesCount: validCycles.length,
+      validCycleLengths: statLengths,
+      baselineDate: cycleSummary.newBaselineDate,
+      daysSinceLastStart: cycleSummary.daysSinceLastPeriodStart,
+      longestGapDays: longestGap,
+    },
+    standingFlags: triage.standingFlags.map((s) => ({
+      ruleId: s.ruleId,
+      title: s.title,
+      reason: s.reason,
+    })),
+    openEventIds: triage.openEvents.flatMap((e) => e.ruleIds),
     medicinesSummary: options.includeMedicines ? medSummary : null,
   };
 

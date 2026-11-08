@@ -1,22 +1,35 @@
 import { useState } from 'preact/hooks';
-import { isBackupOverdue } from '../../app/store';
+import { computeStep2Snapshot, isBackupOverdue } from '../../app/store';
 import type {
   BackupMeta,
   DateKey,
   DayLog,
+  Decision,
   DoctorVisit,
   MedicineEntry,
+  Profile,
+  Stamp,
+  Verdict,
+  WatchItem,
 } from '../../core/model/types';
 
 interface RecordScreenProps {
   today: DateKey;
+  nowIso: Stamp;
+  profile: Profile;
   dayLogs: readonly DayLog[];
+  decisions: readonly Decision[];
   medicines: readonly MedicineEntry[];
+  verdicts: readonly Verdict[];
+  watchItems: readonly WatchItem[];
   visits: readonly DoctorVisit[];
   meta: BackupMeta;
   onEditDay: (date: DateKey) => void;
+  onSaveDecision: (decision: Decision) => Promise<void>;
+  onDeleteDecision: (id: string) => Promise<void>;
   onDeleteMedicine: (id: string) => Promise<void>;
   onSaveVisit: (visit: DoctorVisit) => Promise<void>;
+  onDismissEvent: (verdictId: string) => Promise<void>;
   onOpenDoctorFile: () => void;
   onQuickExportBackup: () => void;
   onSnoozeBackup: () => Promise<void>;
@@ -24,13 +37,21 @@ interface RecordScreenProps {
 
 export function RecordScreen({
   today,
+  nowIso,
+  profile,
   dayLogs,
+  decisions,
   medicines,
+  verdicts,
+  watchItems,
   visits,
   meta,
   onEditDay,
+  onSaveDecision,
+  onDeleteDecision,
   onDeleteMedicine,
   onSaveVisit,
+  onDismissEvent,
   onOpenDoctorFile,
   onQuickExportBackup,
   onSnoozeBackup,
@@ -38,10 +59,37 @@ export function RecordScreen({
   const [pastDate, setPastDate] = useState<string>(today);
   const [visitDate, setVisitDate] = useState<string>(today);
   const [visitNote, setVisitNote] = useState<string>('');
+  const [baselineDate, setBaselineDate] = useState<string>(today);
+
+  const step2 = computeStep2Snapshot(
+    {
+      profile,
+      dayLogs: [...dayLogs],
+      bodyLogs: [],
+      decisions: [...decisions],
+      forecasts: [],
+      verdicts: [...verdicts],
+      watchItems: [...watchItems],
+      visits: [...visits],
+      medicines: [...medicines],
+      companion: {
+        rings: 0,
+        stage: 0,
+        unlocked: ['dusk', 'dawn', 'high-contrast'],
+        badges: [],
+        lastRingDate: null,
+      },
+      meta,
+    },
+    today,
+    today,
+    nowIso,
+  );
 
   const sortedDays = [...dayLogs].sort((a, b) => b.date.localeCompare(a.date));
   const sortedMeds = [...medicines].sort((a, b) => b.date.localeCompare(a.date));
   const sortedVisits = [...visits].sort((a, b) => b.date.localeCompare(a.date));
+  const sortedVerdicts = [...verdicts].sort((a, b) => b.at.localeCompare(a.at));
   const backupOverdue = isBackupOverdue(meta, dayLogs.length, today);
 
   async function handleAddVisit(e: Event): Promise<void> {
@@ -53,6 +101,23 @@ export function RecordScreen({
       note: visitNote.trim(),
     });
     setVisitNote('');
+  }
+
+  async function toggleIgnoreCycle(startDate: DateKey, currentlyIgnored: boolean): Promise<void> {
+    if (currentlyIgnored) {
+      const match = decisions.find(
+        (d) => d.kind === 'ignore-in-predictions' && d.date === startDate,
+      );
+      if (match) await onDeleteDecision(match.id);
+      return;
+    }
+    await onSaveDecision({
+      id: `ignore-${startDate}-${Date.now()}`,
+      date: startDate,
+      kind: 'ignore-in-predictions',
+      at: nowIso,
+      note: 'Excluded from prediction weights',
+    });
   }
 
   return (
@@ -81,7 +146,8 @@ export function RecordScreen({
               Record
             </h2>
             <p class="muted" style={{ margin: 0 }}>
-              <span class="tabular">{dayLogs.length}</span> days logged ·{' '}
+              <span class="tabular">{dayLogs.length}</span> days ·{' '}
+              <span class="tabular">{step2.cycles.cycles.length}</span> cycles ·{' '}
               <span class="tabular">{medicines.length}</span> medicines
             </p>
           </div>
@@ -90,6 +156,150 @@ export function RecordScreen({
           </button>
         </div>
       </section>
+
+      <section class="card" aria-label="Derived cycles">
+        <h2 class="card-title">Derived cycles</h2>
+        {step2.cycles.openCycle && (
+          <p style={{ marginTop: 0 }}>
+            Current cycle started <strong class="tabular">{step2.cycles.openCycle.startDate}</strong>{' '}
+            (day <strong class="tabular">{step2.cycles.openCycle.daysSinceStart}</strong>).
+          </p>
+        )}
+
+        {step2.cycles.cycles.length === 0 ? (
+          <p class="muted" style={{ marginTop: 0 }}>
+            Log two period starts to derive cycle lengths here.
+          </p>
+        ) : (
+          [...step2.cycles.cycles]
+            .reverse()
+            .slice(0, 12)
+            .map((c) => (
+              <div
+                key={c.id}
+                class="btn-row"
+                style={{
+                  justifyContent: 'space-between',
+                  paddingBlock: '8px',
+                  borderBottom: '1px solid var(--border)',
+                }}
+              >
+                <div>
+                  <div class="tabular">
+                    <strong>{c.startDate}</strong> · {c.lengthDays} days ({c.bleedingDays} bleeding days)
+                  </div>
+                  <div class="muted">
+                    {c.beforeBaseline ? 'before the change · ' : ''}
+                    {c.dateCheckFlag ? `${c.dateCheckFlag} · ` : ''}
+                    {c.approximate ? 'approximate · ' : ''}
+                    {c.leadInDays > 0 ? `${c.leadInDays}d spotting lead-in` : 'no lead-in spotting'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="chip"
+                  aria-pressed={c.ignoredInPredictions}
+                  onClick={() => void toggleIgnoreCycle(c.startDate, c.ignoredInPredictions)}
+                >
+                  {c.ignoredInPredictions ? 'Ignored' : 'Ignore cycle'}
+                </button>
+              </div>
+            ))
+        )}
+
+        <div class="field" style={{ marginTop: '12px', marginBottom: 0 }}>
+          <label htmlFor="baseline-date-input">Start fresh marker (after hormone change)</label>
+          <div class="btn-row">
+            <input
+              id="baseline-date-input"
+              class="input"
+              type="date"
+              max={today}
+              value={baselineDate}
+              onInput={(e) => setBaselineDate((e.target as HTMLInputElement).value)}
+              style={{ flex: '1 1 180px' }}
+            />
+            <button
+              type="button"
+              class="btn btn-small"
+              onClick={() =>
+                void onSaveDecision({
+                  id: `baseline-${baselineDate || today}-${Date.now()}`,
+                  date: baselineDate || today,
+                  kind: 'new-baseline',
+                  at: nowIso,
+                  note: 'Start fresh marker set in Record',
+                })
+              }
+            >
+              Set start fresh
+            </button>
+          </div>
+          {step2.cycles.newBaselineDate && (
+            <p class="muted" style={{ marginBottom: 0 }}>
+              Active baseline date: <strong class="tabular">{step2.cycles.newBaselineDate}</strong>
+            </p>
+          )}
+        </div>
+      </section>
+
+      {step2.triageToday.standingFlags.length > 0 && (
+        <section class="card" aria-label="Standing history flags">
+          <h2 class="card-title">Standing patterns</h2>
+          {step2.triageToday.standingFlags.map((flag) => (
+            <div key={flag.ruleId} style={{ paddingBlock: '6px', borderTop: '1px solid var(--border)' }}>
+              <strong>
+                {flag.ruleId}: {flag.title}
+              </strong>
+              <p class="muted" style={{ margin: '4px 0 0 0' }}>
+                {flag.reason} {flag.message}
+              </p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {sortedVerdicts.length > 0 && (
+        <section class="card" aria-label="Verdict and flag history">
+          <h2 class="card-title">Flag history</h2>
+          {sortedVerdicts.slice(0, 10).map((v) => (
+            <div
+              key={v.id}
+              class="btn-row"
+              style={{
+                justifyContent: 'space-between',
+                paddingBlock: '8px',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
+              <div>
+                <div class="tabular">
+                  <strong>{v.at.slice(0, 10)}</strong> · {v.title} ({v.ruleIds.join(', ') || v.level})
+                </div>
+                <div class="muted">
+                  {v.reasons.join(' ')}
+                  {v.closedByVisit
+                    ? ' · Closed by doctor visit'
+                    : v.dismissedAt
+                      ? ` · Got it (${v.dismissedAt.slice(0, 10)})`
+                      : v.kind === 'event'
+                        ? ' · Open'
+                        : ''}
+                </div>
+              </div>
+              {v.kind === 'event' && !v.dismissedAt && !v.closedByVisit && (
+                <button
+                  type="button"
+                  class="btn btn-small"
+                  onClick={() => void onDismissEvent(v.id)}
+                >
+                  Got it
+                </button>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       <section class="card" aria-label="Timeline">
         <h2 class="card-title">Timeline</h2>

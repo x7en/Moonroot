@@ -91,7 +91,7 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
           <h2 class="card-title">Welcome to Moonroot</h2>
           <p>Everything stays on this phone. No account, no cloud sync, no internet needed.</p>
           <p class="notice-banner">
-            This version records your log only. Warning checks start in Step 2.
+            Private on-device check-in intelligence: entries stay on this phone and are sorted locally.
           </p>
           <label class="chip" style={{ width: '100%', marginBottom: '16px' }}>
             <input

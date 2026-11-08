@@ -124,11 +124,7 @@ const PERIOD_FLOWS = new Set<Flow>(['light', 'medium', 'heavy']);
 const DOCTOR_TAIL = 'If you are worried, see a doctor even if this looks fine.';
 
 function ruleMeta(id: RuleId): TriageRuleDefinition {
-  const found = RULE_BY_ID.get(id);
-  if (!found) {
-    throw new Error(`Missing rule metadata: ${id}`);
-  }
-  return found;
+  return RULE_BY_ID.get(id) as TriageRuleDefinition;
 }
 
 function hasAnyDanger(

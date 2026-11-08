@@ -42,7 +42,7 @@ describe('Step 1 UI and gate verification', () => {
     // Step 1: disclaimer required
     const continueBtn = await screen.findByRole('button', { name: 'Continue' });
     expect((continueBtn as HTMLButtonElement).disabled).toBe(true);
-    expect(document.body.textContent).toContain('records your log only');
+    expect(document.body.textContent).toContain('sorted locally');
 
     await runAxe(container);
 
@@ -66,8 +66,8 @@ describe('Step 1 UI and gate verification', () => {
 
     // Today screen loaded
     const heavyBtn = await screen.findByRole('button', { name: /Heavy flow/i });
-    expect(document.body.textContent).toContain('Records only');
-    // Step 1 must NEVER display verdict level Green / Nothing flagged
+    expect(document.body.textContent).toContain('Ready for today');
+    // Unanswered day must NEVER display verdict level Green / Nothing flagged
     expect(document.body.textContent).not.toContain('Nothing flagged');
 
     await runAxe(container);

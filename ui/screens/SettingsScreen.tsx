@@ -437,7 +437,8 @@ export function SettingsScreen({
           does not diagnose.
         </p>
         <p class="muted" style={{ marginBottom: 0 }}>
-          Step 1 build: records only. Warning checks start in Step 2.
+          Step 2 build: check-in intelligence, cycle derivation, watch checks and clinical review
+          doctor summary active on-device.
         </p>
       </section>
 

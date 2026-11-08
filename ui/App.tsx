@@ -5,7 +5,15 @@ import {
   MoonrootStore,
 } from '../app/store';
 import { isUnder18 } from '../core/model/dates';
-import type { DateKey, DayLog, DoctorVisit, MedicineEntry, Profile } from '../core/model/types';
+import type {
+  DateKey,
+  DayLog,
+  Decision,
+  DoctorVisit,
+  MedicineEntry,
+  Profile,
+  StandingFlagId,
+} from '../core/model/types';
 import { getLocalDateKey, getLocalStamp } from '../platform/web';
 import { DoctorFileSheet } from './components/DoctorFileSheet';
 import { GetHelpSheet } from './components/GetHelpSheet';
@@ -39,7 +47,10 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
 
   useEffect(() => {
     let active = true;
-    void store.init().then(() => {
+    void store.init().then(async () => {
+      if (store.snapshot.profile && !store.locked) {
+        await store.syncTriageState();
+      }
       if (active) {
         setReady(true);
         refresh();
@@ -73,6 +84,9 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
       <PinLockScreen
         onUnlock={async (pin) => {
           const ok = await store.unlockWithPin(pin);
+          if (ok) {
+            await store.syncTriageState();
+          }
           refresh();
           return ok;
         }}
@@ -94,6 +108,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           nowIso={nowIso}
           onComplete={async (nextProfile) => {
             await store.saveProfile(nextProfile);
+            await store.syncTriageState();
             refresh();
           }}
         />
@@ -129,6 +144,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
 
   async function handleSaveProfile(next: Profile): Promise<void> {
     await store.saveProfile(next);
+    await store.syncTriageState();
     refresh();
   }
 
@@ -164,11 +180,40 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             nowIso={nowIso}
             profile={profile}
             dayLog={store.getDayLog(selectedDate)}
+            dayLogs={store.snapshot.dayLogs}
+            decisions={store.snapshot.decisions}
             medicines={store.snapshot.medicines}
+            verdicts={store.snapshot.verdicts}
+            watchItems={store.snapshot.watchItems}
+            visits={store.snapshot.visits}
             onChangeDate={(date) => setSelectedDate(date)}
             onSaveDayLog={handleSaveDayLog}
+            onSaveDecision={async (dec: Decision) => {
+              await store.saveDecision(dec);
+              refresh();
+            }}
+            onDismissEvent={async (verdictId) => {
+              await store.dismissEventCard(verdictId);
+              refresh();
+            }}
+            onDismissStandingPrompt={async (
+              ruleId: StandingFlagId,
+              title: string,
+              reason: string,
+            ) => {
+              await store.dismissStandingPrompt(ruleId, title, reason);
+              refresh();
+            }}
+            onAnswerWatchItem={async (watchId, answers) => {
+              await store.answerWatchCheck(watchId, answers);
+              refresh();
+            }}
             onSaveMedicine={async (entry: MedicineEntry) => {
               await store.saveMedicine(entry);
+              refresh();
+            }}
+            onSaveVisit={async (visit: DoctorVisit) => {
+              await store.saveVisit(visit);
               refresh();
             }}
             onOpenGetHelp={() => setGetHelpOpen(true)}
@@ -178,13 +223,26 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         {tab === 'record' && (
           <RecordScreen
             today={today}
+            nowIso={nowIso}
+            profile={profile}
             dayLogs={store.snapshot.dayLogs}
+            decisions={store.snapshot.decisions}
             medicines={store.snapshot.medicines}
+            verdicts={store.snapshot.verdicts}
+            watchItems={store.snapshot.watchItems}
             visits={store.snapshot.visits}
             meta={store.snapshot.meta}
             onEditDay={(date) => {
               setSelectedDate(date);
               setTab('today');
+            }}
+            onSaveDecision={async (dec: Decision) => {
+              await store.saveDecision(dec);
+              refresh();
+            }}
+            onDeleteDecision={async (id) => {
+              await store.deleteDecision(id);
+              refresh();
             }}
             onDeleteMedicine={async (id) => {
               await store.deleteMedicine(id);
@@ -192,6 +250,10 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             }}
             onSaveVisit={async (visit: DoctorVisit) => {
               await store.saveVisit(visit);
+              refresh();
+            }}
+            onDismissEvent={async (verdictId) => {
+              await store.dismissEventCard(verdictId);
               refresh();
             }}
             onOpenDoctorFile={() => setDoctorFileOpen(true)}
@@ -295,6 +357,9 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         dayLogs={store.snapshot.dayLogs}
         medicines={store.snapshot.medicines}
         visits={store.snapshot.visits}
+        decisions={store.snapshot.decisions}
+        verdicts={store.snapshot.verdicts}
+        watchItems={store.snapshot.watchItems}
         onDownload={(filename, content, mime) => store.downloadFile(filename, content, mime)}
         onClose={() => setDoctorFileOpen(false)}
       />

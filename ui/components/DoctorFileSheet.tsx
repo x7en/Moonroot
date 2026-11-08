@@ -3,9 +3,12 @@ import { APP_VERSION } from '../../app/store';
 import type {
   DateKey,
   DayLog,
+  Decision,
   DoctorVisit,
   MedicineEntry,
   Profile,
+  Verdict,
+  WatchItem,
 } from '../../core/model/types';
 import {
   buildDoctorFile,
@@ -21,6 +24,9 @@ interface DoctorFileSheetProps {
   dayLogs: readonly DayLog[];
   medicines: readonly MedicineEntry[];
   visits: readonly DoctorVisit[];
+  decisions?: readonly Decision[];
+  verdicts?: readonly Verdict[];
+  watchItems?: readonly WatchItem[];
   onDownload: (filename: string, content: string, mimeType: string) => void;
   onClose: () => void;
 }
@@ -33,6 +39,9 @@ export function DoctorFileSheet({
   dayLogs,
   medicines,
   visits,
+  decisions = [],
+  verdicts = [],
+  watchItems = [],
   onDownload,
   onClose,
 }: DoctorFileSheetProps) {
@@ -40,6 +49,7 @@ export function DoctorFileSheet({
   const [format, setFormat] = useState<DoctorFileFormat>('md');
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeMedicines, setIncludeMedicines] = useState(true);
+  const [includeVerdicts, setIncludeVerdicts] = useState(true);
   const [includeIntimacy, setIncludeIntimacy] = useState(false);
   const [worryNote, setWorryNote] = useState('');
 
@@ -52,11 +62,15 @@ export function DoctorFileSheet({
         dayLogs,
         medicines,
         visits,
+        decisions,
+        verdicts,
+        watchItems,
         options: {
           range,
           format,
           includeNotes,
           includeMedicines,
+          includeVerdicts,
           includeIntimacy: under18 ? false : includeIntimacy,
           worryNote,
         },
@@ -67,10 +81,14 @@ export function DoctorFileSheet({
       dayLogs,
       medicines,
       visits,
+      decisions,
+      verdicts,
+      watchItems,
       range,
       format,
       includeNotes,
       includeMedicines,
+      includeVerdicts,
       includeIntimacy,
       worryNote,
       under18,
@@ -161,6 +179,14 @@ export function DoctorFileSheet({
               onClick={() => setIncludeMedicines((v) => !v)}
             >
               Medicines and conditions
+            </button>
+            <button
+              type="button"
+              class="chip"
+              aria-pressed={includeVerdicts}
+              onClick={() => setIncludeVerdicts((v) => !v)}
+            >
+              Verdict history
             </button>
             {!under18 && (
               <button

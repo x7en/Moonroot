@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { DANGER_SIGN_CATALOGUE } from '../../core/model/catalogues';
 import type { DangerSign } from '../../core/model/types';
 
@@ -48,6 +48,7 @@ export function DangerSignSheet({
   const [answered, setAnswered] = useState<boolean>(initialAnswered);
   const [feltFever, setFeltFever] = useState<boolean>(Boolean(initialFever?.felt));
   const [tempInput, setTempInput] = useState<string>(toDisplayTemp(initialFever?.c, tempUnit));
+  const tempInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!open) return null;
 
@@ -56,7 +57,8 @@ export function DangerSignSheet({
   );
 
   function buildFever(): { c?: number; felt?: boolean } | undefined {
-    const c = toCelsius(tempInput, tempUnit);
+    const rawTemp = tempInputRef.current ? tempInputRef.current.value : tempInput;
+    const c = toCelsius(rawTemp, tempUnit);
     if (c === undefined && !feltFever) return undefined;
     return {
       ...(c !== undefined ? { c } : {}),
@@ -140,6 +142,7 @@ export function DangerSignSheet({
           <div class="field" style={{ marginBottom: 0 }}>
             <label htmlFor="danger-temp-input">Measured temperature in °{tempUnit} (optional)</label>
             <input
+              ref={tempInputRef}
               id="danger-temp-input"
               class="input"
               type="number"
@@ -147,6 +150,7 @@ export function DangerSignSheet({
               inputMode="decimal"
               value={tempInput}
               onInput={(e) => setTempInput((e.target as HTMLInputElement).value)}
+              onChange={(e) => setTempInput((e.target as HTMLInputElement).value)}
               placeholder={tempUnit === 'C' ? 'e.g. 38.2' : 'e.g. 100.8'}
             />
           </div>
@@ -155,8 +159,8 @@ export function DangerSignSheet({
         {selected.length > 0 && (
           <div class="notice-banner" style={{ borderColor: 'var(--level-red)' }}>
             <p style={{ marginTop: 0 }}>
-              You selected a warning sign. If you feel very unwell now, open Get help. Full warning
-              checks arrive in the next version.
+              You selected a warning sign. Saving updates your Today result right away. If you feel
+              very unwell now, open Get help.
             </p>
             <button
               type="button"
@@ -176,7 +180,7 @@ export function DangerSignSheet({
         )}
 
         <p class="muted">
-          This version records your log only. Warning checks start in Step 2.
+          Warning checks run on this device as soon as you save your answers.
         </p>
 
         <div class="btn-row">

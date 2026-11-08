@@ -364,4 +364,92 @@ describe('Step 2 watch lists, event lifecycle, hormone baseline reset, and perfo
     expect(std1).toBeDefined();
     expect(std1?.dueForSoftPrompt).toBe(false);
   });
+
+  it('evaluates raw risk dates, ORG-03 with hormone note, raw 8-day period ORG-01, and under-18 ORG-14 addon', () => {
+    const today = '2026-10-30';
+    // Unprotected sex 25 days ago + period 35 days ago -> recent pregnancy risk triggers pregnancy-possible branch + 8-day period triggers ORG-01 without derived
+    const rawLogs: DayLog[] = [
+      makeDay('2026-09-25', { flow: 'medium', pain: { level: 1, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-09-26', { flow: 'medium', pain: { level: 1, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-09-27', { flow: 'medium', pain: { level: 1, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-09-28', { flow: 'medium', pain: { level: 1, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-09-29', { flow: 'light', pain: { level: 0, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-09-30', { flow: 'light', pain: { level: 0, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-10-01', { flow: 'light', pain: { level: 0, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-10-02', { flow: 'light', pain: { level: 0, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-10-05', {
+        flow: 'none',
+        pain: { level: 0, sites: [] },
+        intimacy: { event: 'unprotected' },
+      }),
+    ];
+    const org01Res = evaluateTriage({
+      today,
+      profile: { ...ADULT_PROFILE, onHormones: true },
+      dayLog: makeDay(today, {
+        flow: 'none',
+        pain: { level: 0, sites: [] },
+        dangerAnswered: true,
+      }),
+      recentLogs: rawLogs,
+      decisions: [],
+      medicines: [],
+      watchItems: [],
+      existingVerdicts: [],
+      visits: [],
+    });
+    expect(org01Res.firedEventRules.some((e) => e.ruleId === 'ORG-01')).toBe(true);
+
+    // ORG-03 (>= 90 days since last period) with onHormones + under18 attaches hormoneNote and under-18 addon
+    const amenorrheaLogs: DayLog[] = [
+      makeDay('2026-07-01', { flow: 'medium', pain: { level: 1, sites: [] }, dangerAnswered: true }),
+      makeDay('2026-07-02', { flow: 'medium', pain: { level: 1, sites: [] }, dangerAnswered: true }),
+    ];
+    const org03Res = evaluateTriage({
+      today: '2026-10-14',
+      profile: {
+        ...ADULT_PROFILE,
+        birthYear: 2010,
+        intimacy: 'prefer-not-to-say',
+        onHormones: true,
+      },
+      dayLog: makeDay('2026-10-14', { flow: 'none', pain: { level: 0, sites: [] }, dangerAnswered: true }),
+      recentLogs: amenorrheaLogs,
+      decisions: [],
+      medicines: [],
+      watchItems: [],
+      existingVerdicts: [],
+      visits: [],
+    });
+    const org03Event = org03Res.firedEventRules.find((e) => e.ruleId === 'ORG-03');
+    expect(org03Event).toBeDefined();
+    expect(org03Event?.message).toContain('Some hormone medicines stop periods');
+    expect(org03Event?.message).toContain('parent, relative or school nurse');
+
+    // Under-18 ORG-14 includes parent/relative/school nurse guidance addon
+    const under18Org14 = evaluateTriage({
+      today,
+      profile: {
+        ...ADULT_PROFILE,
+        birthYear: 2010,
+        intimacy: 'prefer-not-to-say',
+      },
+      dayLog: makeDay(today, {
+        flow: 'none',
+        pain: { level: 6, sites: ['lower-middle'] },
+        danger: ['dizzy'],
+        dangerAnswered: true,
+        pregnancyChance: 'no',
+      }),
+      recentLogs: [],
+      decisions: [],
+      medicines: [],
+      watchItems: [],
+      existingVerdicts: [],
+      visits: [],
+    });
+    expect(under18Org14.today.level).toBe('orange');
+    expect(under18Org14.today.ruleIds).toContain('ORG-14');
+    expect(under18Org14.today.message).toContain('parent, relative or school nurse');
+  });
 });

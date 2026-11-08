@@ -409,3 +409,75 @@ textarea {
   white-space: nowrap;
   border: 0;
 }
+
+.verdict-card {
+  border-width: 2px;
+}
+
+.verdict-red {
+  border-color: var(--level-red);
+}
+
+.verdict-orange {
+  border-color: var(--level-orange);
+}
+
+.verdict-yellow {
+  border-color: var(--level-yellow);
+}
+
+.verdict-green {
+  border-color: var(--level-green);
+}
+
+.verdict-incomplete {
+  border-color: var(--lamp);
+}
+
+.verdict-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.verdict-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  background-color: var(--surface-2);
+}
+
+.verdict-red .verdict-icon {
+  background-color: var(--level-red);
+  color: #ffffff;
+}
+
+.verdict-orange .verdict-icon {
+  background-color: var(--level-orange);
+  color: #1c1408;
+}
+
+.verdict-yellow .verdict-icon {
+  background-color: var(--level-yellow);
+  color: #1c1408;
+}
+
+.verdict-green .verdict-icon {
+  background-color: var(--level-green);
+  color: #0f1c16;
+}
+
+.verdict-incomplete .verdict-icon {
+  background-color: var(--lamp);
+  color: var(--lamp-text);
+}
+

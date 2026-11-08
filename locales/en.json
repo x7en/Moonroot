@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Moonroot",
-    "step1Notice": "This version records your log only. Warning checks start in Step 2.",
+    "step2Notice": "Checks active: your entries are sorted locally on this device.",
     "disclaimer": "This app tracks and sorts urgency. It does not diagnose.",
     "under18GuidanceAddon": "Tell a parent, relative or school nurse if you can.",
     "openEventReplacesGreen": "Nothing new today. An earlier flag is still open."
@@ -10,7 +10,9 @@
     "green": "Nothing flagged",
     "yellow": "Keep watching",
     "orange": "See a doctor soon",
-    "red": "Get care today"
+    "red": "Get care today",
+    "incomplete": "More answers needed",
+    "openEventNotice": "Nothing new today"
   },
   "notifications": {
     "dailyCheckIn": "Moonroot: a quick check-in?"
@@ -133,6 +135,5 @@
       "dischargeStillThere": "Is the discharge still there?"
     }
   },
-  "step1DangerPrompt": "You selected a warning sign. If you feel very unwell now, open Get help. Full warning checks arrive in the next version.",
-  "openGetHelp": "Open Get help"
+  "catchUpPrompt": "Welcome back. Want a 20-second catch-up?"
 }
