@@ -627,13 +627,16 @@ export const CASE_CARDS: readonly PatientCaseCard[] = [
   },
   {
     id: 'CASE-33',
-    title: 'Open decision edge case: Pain 8/10, not sudden, no pain medicine tried',
-    category: 'below-threshold',
-    plainStory: 'Age 21. Flow=none, pain=8/10, sudden=false, reliefHelped=none-taken, danger=none.',
+    title: 'Law 1 fix (YEL-02): Pain 8/10, not sudden, no pain medicine tried',
+    category: 'law-preservation',
+    plainStory:
+      'Age 21. Flow=none, pain=8/10, sudden=false, reliefHelped=none-taken, danger=none. Upper limit removed from YEL-02 (temporary unreviewed Std fix) so pain 8+ never drops to Green.',
     answersSummary: ['Flow: none', 'Pain: 8/10', 'Sudden: no', 'Relief helped: none-taken'],
-    expectedTodayLevel: 'green',
-    expectedRuleIds: ['GRN-01'],
-    expectedTextNotes: ['Open decision: pain >= 8 with no medicine tried awaits clinician threshold'],
+    expectedTodayLevel: 'yellow',
+    expectedRuleIds: ['YEL-02'],
+    expectedTextNotes: [
+      'Temporary Std Law 1 fix (not clinical approval of Yellow): pain 8+ with no medicine tried must not drop to Green; open clinician decision asks what level pain >= 8 with none-taken should get.',
+    ],
     snapshot: {
       today: BASE_DATE,
       profile: { birthYear: 2005 },
@@ -748,15 +751,15 @@ export const CASE_CARDS: readonly PatientCaseCard[] = [
   },
   {
     id: 'CASE-39',
-    title: 'ORG-14 clinical-review gap: Non-sudden pain 8/10 with dizziness and no medicine tried',
-    category: 'below-threshold',
+    title: 'Law 1 fix (ORG-14): Non-sudden pain 8/10 with dizziness and no medicine tried',
+    category: 'law-preservation',
     plainStory:
-      'Age 21. Flow=none, pain=8/10 (not sudden), reliefHelped=none-taken, and ticked Dizzy on danger screen. ORG-14 stops at 7 and RED-03/RED-08 do not fire.',
+      'Age 21. Flow=none, pain=8/10 (not sudden), reliefHelped=none-taken, and ticked Dizzy on danger screen. Upper limit removed from ORG-14 (temporary unreviewed Std fix) so pain 8+ with dizziness stays Orange instead of dropping to Green.',
     answersSummary: ['Flow: none', 'Pain: 8/10, not sudden', 'Relief helped: none-taken', 'Danger sign: dizzy'],
-    expectedTodayLevel: 'green',
-    expectedRuleIds: ['GRN-01'],
+    expectedTodayLevel: 'orange',
+    expectedRuleIds: ['ORG-14'],
     expectedTextNotes: [
-      'UNREVIEWED GAP: Should pain 8 to 10 with dizziness, nausea or looking very pale be orange or red when it is not sudden and pain relief has not failed?',
+      'Temporary Std Law 1 fix (not clinical approval of Orange): pain 8+ with dizziness/nausea/paleness must not drop below pain 7. Open clinician decision: pain 8 or more with no pain medicine tried needs a clinician-selected level.',
     ],
     snapshot: {
       today: BASE_DATE,

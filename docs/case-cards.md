@@ -265,13 +265,13 @@
 - **App verdict**: `green` · **Rules**: `GRN-01`
 - **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________
 
-## CASE-33: Open decision edge case: Pain 8/10, not sudden, no pain medicine tried
+## CASE-33: Law 1 fix (YEL-02): Pain 8/10, not sudden, no pain medicine tried
 
-- **Category**: below-threshold
-- **Patient scenario**: Age 21. Flow=none, pain=8/10, sudden=false, reliefHelped=none-taken, danger=none.
+- **Category**: law-preservation
+- **Patient scenario**: Age 21. Flow=none, pain=8/10, sudden=false, reliefHelped=none-taken, danger=none. Upper limit removed from YEL-02 (temporary unreviewed Std fix) so pain 8+ never drops to Green.
 - **Answers logged**: Flow: none · Pain: 8/10 · Sudden: no · Relief helped: none-taken
-- **App verdict**: `green` · **Rules**: `GRN-01`
-- **Display / clinical notes**: Open decision: pain >= 8 with no medicine tried awaits clinician threshold
+- **App verdict**: `yellow` · **Rules**: `YEL-02`
+- **Display / clinical notes**: Temporary Std Law 1 fix (not clinical approval of Yellow): pain 8+ with no medicine tried must not drop to Green; open clinician decision asks what level pain >= 8 with none-taken should get.
 - **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________
 
 ## CASE-34: Law 1 fix (YEL-02): Cramps 5/10, no flow, plus non-ORG-14 warning sign
@@ -319,13 +319,13 @@
 - **Display / clinical notes**: Replaces Green with "Nothing new today. An earlier flag is still open."
 - **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________
 
-## CASE-39: ORG-14 clinical-review gap: Non-sudden pain 8/10 with dizziness and no medicine tried
+## CASE-39: Law 1 fix (ORG-14): Non-sudden pain 8/10 with dizziness and no medicine tried
 
-- **Category**: below-threshold
-- **Patient scenario**: Age 21. Flow=none, pain=8/10 (not sudden), reliefHelped=none-taken, and ticked Dizzy on danger screen. ORG-14 stops at 7 and RED-03/RED-08 do not fire.
+- **Category**: law-preservation
+- **Patient scenario**: Age 21. Flow=none, pain=8/10 (not sudden), reliefHelped=none-taken, and ticked Dizzy on danger screen. Upper limit removed from ORG-14 (temporary unreviewed Std fix) so pain 8+ with dizziness stays Orange instead of dropping to Green.
 - **Answers logged**: Flow: none · Pain: 8/10, not sudden · Relief helped: none-taken · Danger sign: dizzy
-- **App verdict**: `green` · **Rules**: `GRN-01`
-- **Display / clinical notes**: UNREVIEWED GAP: Should pain 8 to 10 with dizziness, nausea or looking very pale be orange or red when it is not sudden and pain relief has not failed?
+- **App verdict**: `orange` · **Rules**: `ORG-14`
+- **Display / clinical notes**: Temporary Std Law 1 fix (not clinical approval of Orange): pain 8+ with dizziness/nausea/paleness must not drop below pain 7. Open clinician decision: pain 8 or more with no pain medicine tried needs a clinician-selected level.
 - **Reviewer decision**: [ ] Agree   [ ] Change: ____________________________
 
 ## CASE-40: dangerAnswered answered None of these (heavy flow, danger=[], dangerAnswered=true)

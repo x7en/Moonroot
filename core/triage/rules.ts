@@ -289,7 +289,7 @@ export const RULES_TABLE: readonly TriageRuleDefinition[] = [
     reviewStatus: 'unreviewed',
     specMarker: 'user-decision',
     clinicalReviewNote:
-      'User decision #3 (unreviewed): pain threshold set to pain.level >= 1; shoulder-tip added to PainSite.',
+      'User decision #3 (unreviewed): pain threshold set to pain.level >= 1; shoulder-tip added to PainSite. Neutral guardrail (unreviewed Std): when sexualHealthQuestions is enabled and pregnancyChance is prefer-not-to-say or unanswered alongside bleeding/pain or ectopic pain site, RED-04 stays cautiously neutral and incomplete without asserting pregnancy possible and without granting false Green.',
     plainCondition:
       'One-sided or shoulder-tip pain (1+ out of 10), or any pain (1+) with bleeding or brown discharge, when pregnancy is possible or a test is positive.',
     thresholdDescription: `pain.level >= ${THRESHOLDS.ANY_PAIN_MIN} and (sites includes left/right/shoulder-tip OR bleeding/brown discharge) and (pregnancy possible or test positive)`,
@@ -1368,15 +1368,15 @@ export const RULES_TABLE: readonly TriageRuleDefinition[] = [
     kind: 'today',
     sourceKey: 'Std',
     reviewStatus: 'unreviewed',
-    specMarker: 'new',
+    specMarker: 'changed',
     clinicalReviewNote:
-      'Added 8 Nov 2026 (only Orange row that is a Today rule, not an event card). Clinician note: at pain 8-10 that is NOT sudden and no pain medicine tried, ORG-14 stops at 7 and RED-03/RED-08 do not fire — confirm whether ORG-14 should extend to 4..10.',
+      'Added 8 Nov 2026; changed (unreviewed Std Law 1 fix): upper limit removed from ORG-14 so raising pain from 7 to 8+ with dizziness, nausea or paleness and no flow never lowers Orange to Green. Clinician must confirm the correct level for pain 8 or more when no pain medicine has been tried.',
     plainCondition:
-      'Pain of 4 to 7 out of 10 with dizziness, nausea or looking very pale, and no flow.',
-    thresholdDescription: `pain.level in ${THRESHOLDS.PAIN_FOLLOWUP_MIN}..${THRESHOLDS.PAIN_MODERATE_MAX} and flow === 'none' and danger includes dizzy, nausea, or very-pale`,
+      'Pain of 4 or more out of 10 with dizziness, nausea or looking very pale, and no flow.',
+    thresholdDescription: `pain.level >= ${THRESHOLDS.PAIN_FOLLOWUP_MIN} and flow === 'none' and danger includes dizzy, nausea, or very-pale`,
     title: 'See a doctor soon',
     reasonTemplate:
-      'Because you logged moderate pain with dizziness, nausea or paleness and no flow.',
+      'Because you logged significant pain with dizziness, nausea or paleness and no flow.',
     wordsShown:
       'Pain like this alongside dizziness, nausea or paleness should be checked by a doctor soon. If you are worried, see a doctor even if this looks fine.',
     inputsRead: ['dayLog.pain.level', 'dayLog.flow', 'dayLog.danger'],
@@ -1391,6 +1391,51 @@ export const RULES_TABLE: readonly TriageRuleDefinition[] = [
           dayLog: {
             flow: 'none',
             pain: { level: 4, sites: ['lower-middle'] },
+            danger: ['dizzy'],
+            dangerAnswered: true,
+          },
+        },
+        expectedFires: true,
+      },
+      {
+        id: 'ORG-14-fires-7',
+        kind: 'fires',
+        label: 'Pain 7/10 + flow=none + dizzy -> Orange (ORG-14)',
+        input: {
+          today: BASE_DATE,
+          dayLog: {
+            flow: 'none',
+            pain: { level: 7, sites: ['lower-middle'], sudden: false },
+            danger: ['dizzy'],
+            dangerAnswered: true,
+          },
+        },
+        expectedFires: true,
+      },
+      {
+        id: 'ORG-14-fires-8-no-relief',
+        kind: 'fires',
+        label: 'Law 1 fix: pain 8/10 + flow=none + not sudden + reliefHelped=none-taken + dizzy -> Orange (ORG-14)',
+        input: {
+          today: BASE_DATE,
+          dayLog: {
+            flow: 'none',
+            pain: { level: 8, sites: ['lower-middle'], sudden: false, reliefHelped: 'none-taken' },
+            danger: ['dizzy'],
+            dangerAnswered: true,
+          },
+        },
+        expectedFires: true,
+      },
+      {
+        id: 'ORG-14-fires-10-no-relief',
+        kind: 'fires',
+        label: 'Law 1 fix: pain 10/10 + flow=none + not sudden + reliefHelped=none-taken + dizzy -> Orange (ORG-14)',
+        input: {
+          today: BASE_DATE,
+          dayLog: {
+            flow: 'none',
+            pain: { level: 10, sites: ['lower-middle'], sudden: false, reliefHelped: 'none-taken' },
             danger: ['dizzy'],
             dangerAnswered: true,
           },
@@ -1522,13 +1567,13 @@ export const RULES_TABLE: readonly TriageRuleDefinition[] = [
     kind: 'today',
     sourceKey: 'Std',
     reviewStatus: 'unreviewed',
-    specMarker: 'user-decision',
+    specMarker: 'changed',
     clinicalReviewNote:
-      'Changed 8 Nov 2026 + User decision #5 (Law 1 fix): fires on cramps 4-7 with flow=none even when a warning sign is ticked, so adding a non-red/non-ORG-14 warning sign never lowers Yellow to Green. ORG-14 or Red takes precedence when those fire.',
-    plainCondition: 'Cramps of 4 to 7 out of 10 with no flow.',
-    thresholdDescription: `pain.level in ${THRESHOLDS.PAIN_FOLLOWUP_MIN}..${THRESHOLDS.PAIN_MODERATE_MAX} and flow === 'none'`,
+      'Changed 8 Nov 2026 (unreviewed Std Law 1 fix): upper limit removed from YEL-02 so pain >= 4 with flow=none (even with a non-red/non-ORG-14 warning sign) never lowers Yellow to Green when pain rises from 7 to 8+ with no pain medicine tried. Clinician must confirm the correct level for pain 8 or more when reliefHelped=none-taken. ORG-14 or Red takes precedence when those fire.',
+    plainCondition: 'Pain or cramps of 4 or more out of 10 with no flow.',
+    thresholdDescription: `pain.level >= ${THRESHOLDS.PAIN_FOLLOWUP_MIN} and flow === 'none'`,
     title: 'Keep watching',
-    reasonTemplate: 'Because you logged moderate cramps without bleeding.',
+    reasonTemplate: 'Because you logged cramps or pain without bleeding.',
     wordsShown:
       'Keep watching over the next 24 to 72 hours to see if bleeding starts or the cramps ease.',
     inputsRead: ['dayLog.pain.level', 'dayLog.flow'],
@@ -1554,6 +1599,46 @@ export const RULES_TABLE: readonly TriageRuleDefinition[] = [
             flow: 'none',
             pain: { level: 4, sites: ['lower-middle'] },
             danger: ['unusual-tiredness'],
+            dangerAnswered: true,
+          },
+        },
+        expectedFires: true,
+      },
+      {
+        id: 'YEL-02-fires-7',
+        kind: 'fires',
+        label: 'Pain 7/10 + flow=none -> Yellow (YEL-02)',
+        input: {
+          today: BASE_DATE,
+          dayLog: { flow: 'none', pain: { level: 7, sites: ['lower-middle'] }, danger: [], dangerAnswered: true },
+        },
+        expectedFires: true,
+      },
+      {
+        id: 'YEL-02-fires-8-no-relief',
+        kind: 'fires',
+        label: 'Law 1 fix: pain 8/10 + flow=none + not sudden + reliefHelped=none-taken -> Yellow (YEL-02)',
+        input: {
+          today: BASE_DATE,
+          dayLog: {
+            flow: 'none',
+            pain: { level: 8, sites: ['lower-middle'], sudden: false, reliefHelped: 'none-taken' },
+            danger: [],
+            dangerAnswered: true,
+          },
+        },
+        expectedFires: true,
+      },
+      {
+        id: 'YEL-02-fires-10-no-relief',
+        kind: 'fires',
+        label: 'Law 1 fix: pain 10/10 + flow=none + not sudden + reliefHelped=none-taken -> Yellow (YEL-02)',
+        input: {
+          today: BASE_DATE,
+          dayLog: {
+            flow: 'none',
+            pain: { level: 10, sites: ['lower-middle'], sudden: false, reliefHelped: 'none-taken' },
+            danger: [],
             dangerAnswered: true,
           },
         },
