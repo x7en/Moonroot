@@ -1,0 +1,148 @@
+{
+  "app": {
+    "name": "Moonroot",
+    "step2Notice": "Checks active: your entries are sorted locally on this device.",
+    "disclaimer": "This app tracks and sorts urgency. It does not diagnose.",
+    "under18GuidanceAddon": "Tell a parent, relative or school nurse if you can.",
+    "openEventReplacesGreen": "Nothing new today. An earlier flag is still open."
+  },
+  "levels": {
+    "green": "Nothing flagged",
+    "yellow": "Keep watching",
+    "orange": "See a doctor soon",
+    "red": "Get care today",
+    "incomplete": "More answers needed",
+    "openEventNotice": "Nothing new today"
+  },
+  "notifications": {
+    "dailyCheckIn": "Moonroot: a quick check-in?"
+  },
+  "symptoms": {
+    "cramps": "Cramps",
+    "headache": "Headache",
+    "bloating": "Bloating",
+    "tenderBreasts": "Tender breasts",
+    "backPain": "Back pain",
+    "tiredness": "Tiredness",
+    "cravings": "Cravings",
+    "constipation": "Constipation"
+  },
+  "dangerSigns": {
+    "fainted": "Fainted",
+    "chestPain": "Chest pain",
+    "shortOfBreath": "Trouble breathing",
+    "confused": "Confused",
+    "dizzy": "Dizzy",
+    "nausea": "Sick to my stomach",
+    "veryPale": "Very pale",
+    "vomiting": "Vomiting",
+    "sunburnRash": "Sunburn-like rash",
+    "diarrhoea": "Diarrhoea",
+    "unusualTiredness": "Unusually tired",
+    "breathlessOnEffort": "Breathless on effort",
+    "legPainOrSwelling": "Leg pain or swelling",
+    "severeHeadache": "Sudden severe headache",
+    "visionChange": "Sudden change in vision"
+  },
+  "medicines": {
+    "ponstan": "Ponstan",
+    "ponstanForte": "Ponstan Forte",
+    "brufen": "Brufen",
+    "panadol": "Panadol",
+    "calpol": "Calpol",
+    "combinedPill": "Combined pill",
+    "progestinPill": "Progestin-only pill",
+    "otherHormone": "Other hormone medicine",
+    "iron": "Iron supplement",
+    "dailyLimitReminder": "Check the pack for the daily limit.",
+    "sameMedicineNote": "Same medicine: {names} are both {generic}.",
+    "todaySummary": "Today: {generic}, {doses} doses, {total} mg from the strengths you entered. Check the pack for the daily limit."
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "notSure": "Not sure",
+    "preferNotToSay": "Prefer not to say",
+    "noneOfThese": "None of these"
+  },
+  "protection": {
+    "none": "None",
+    "liner": "Liner",
+    "pad": "Pad",
+    "tampon": "Tampon",
+    "cup": "Cup",
+    "disc": "Disc"
+  },
+  "clots": {
+    "none": "None",
+    "small": "Small clots",
+    "large": "Clots bigger than a coin"
+  },
+  "painSite": {
+    "lowerMiddle": "Middle",
+    "left": "Left",
+    "right": "Right",
+    "back": "Back",
+    "wholeBelly": "Whole belly",
+    "shoulderTip": "Shoulder tip",
+    "other": "Other"
+  },
+  "questions": {
+    "dangerScreen": "Any of these right now?",
+    "dangerScreenUnsureHint": "If you are not sure, pick the closest one.",
+    "feverish": "Fever or feeling feverish?",
+    "painScale": "Pain from 0 to 10",
+    "pregnancyChance": "Is there any chance you could be pregnant?",
+    "tamponOrCup": "Are you using a tampon or cup?",
+    "lowerBellyPain": "Lower belly pain?",
+    "discharge": "Smelly or yellow-green discharge?",
+    "stoolBlood": "Is it from the back passage, or from your period?",
+    "startFresh": "Start predictions fresh from this date?",
+    "spotting": {
+      "protection": "Drops only, or did you need a pad or tampon?",
+      "dropsOnly": "Drops only",
+      "cramps": "Any cramps: none, mild, strong?",
+      "moreThanYesterday": "Is it more than yesterday?"
+    },
+    "heavy": {
+      "changeEvery": "How often are you changing a pad or tampon?",
+      "soakedHourly2h": "Every hour or more often for 2 hours or more",
+      "every1to2h": "Every 1 to 2 hours",
+      "every2to3h": "Every 2 to 3 hours",
+      "lessOften": "Less often",
+      "clotsAndLeaks": "Clots and leaks",
+      "flooding": "Flooding",
+      "doubleProtection": "Two products at once"
+    },
+    "pain": {
+      "where": "Where is the pain?",
+      "sudden": "Did it start suddenly?",
+      "reliefHelped": "Has pain medicine helped?",
+      "noneTaken": "I have not taken any"
+    },
+    "noPeriod": {
+      "changed": "No period yet. Has anything changed lately?"
+    },
+    "afterSex": {
+      "painToo": "Was there pain too?",
+      "before": "Has it happened before?"
+    },
+    "stoolBloodOptions": {
+      "backPassage": "Back passage",
+      "period": "Period"
+    },
+    "watch": {
+      "dischargeStillThere": "Is the discharge still there?"
+    }
+  },
+  "catchUpPrompt": "Welcome back. Want a 20-second catch-up?",
+  "cycle": {
+    "confidenceLabel": "Confidence",
+    "likelyWidthCaption": "likely window {days} days wide",
+    "measuredCount": "Past possible windows held the real start in {hits} of the last {total}.",
+    "highVariabilityNote": "Your cycles vary a lot, so ranges stay wide. That limit comes from the cycles, not from how you log.",
+    "leadInRetired": "This pattern is not holding.",
+    "noCyclesYet": "Log your first period to start.",
+    "emptyHint": "Your ranges, confidence meter, and patterns unlock as you log periods."
+  }
+}
