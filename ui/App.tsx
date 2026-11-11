@@ -4,7 +4,9 @@ import {
   makeDefaultProfile,
   makeEmptyDayLog,
   MoonrootStore,
+  type CompanionUpdateOutcome,
 } from '../app/store';
+import { canUseTheme, deriveSproutMood } from '../core/companion/companion';
 import { isUnder18 } from '../core/model/dates';
 import type {
   BodyLog,
@@ -14,9 +16,16 @@ import type {
   DoctorVisit,
   MedicineEntry,
   Profile,
+  SproutReaction,
   StandingFlagId,
 } from '../core/model/types';
-import { getLocalDateKey, getLocalStamp } from '../platform/web';
+import {
+  getLocalDateKey,
+  getLocalStamp,
+  prefersLightTheme,
+  prefersReducedMotion,
+  triggerHaptic,
+} from '../platform/web';
 import { DoctorFileSheet } from './components/DoctorFileSheet';
 import { GetHelpSheet } from './components/GetHelpSheet';
 import { BodyScreen } from './screens/BodyScreen';
@@ -43,7 +52,13 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   const [getHelpOpen, setGetHelpOpen] = useState(false);
   const [doctorFileOpen, setDoctorFileOpen] = useState(false);
   const [undoState, setUndoState] = useState<UndoState | null>(null);
+  const [activeReaction, setActiveReaction] = useState<SproutReaction | null>(null);
+  const [activePetalBurst, setActivePetalBurst] = useState(false);
+  const [activeStageUp, setActiveStageUp] = useState(false);
   const undoTimerRef = useRef<number | null>(null);
+  const reactionTimerRef = useRef<number | null>(null);
+  const petalTimerRef = useRef<number | null>(null);
+  const stageUpTimerRef = useRef<number | null>(null);
 
   const today = getLocalDateKey();
   const nowIso = getLocalStamp();
@@ -63,15 +78,58 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
     return () => {
       active = false;
       if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);
+      if (reactionTimerRef.current !== null) window.clearTimeout(reactionTimerRef.current);
+      if (petalTimerRef.current !== null) window.clearTimeout(petalTimerRef.current);
+      if (stageUpTimerRef.current !== null) window.clearTimeout(stageUpTimerRef.current);
     };
   }, [store]);
 
   const profile = store.snapshot.profile;
-  const activeTheme = profile?.theme ?? 'dusk';
+  const reducedMotion = Boolean(profile?.reducedMotion) || prefersReducedMotion();
+  const hapticsEnabled = profile?.haptics !== false;
+  const rawTheme = profile?.theme ?? 'dusk';
+  const resolvedTheme =
+    rawTheme === 'auto'
+      ? prefersLightTheme()
+        ? 'dawn'
+        : 'dusk'
+      : canUseTheme(rawTheme, store.snapshot.companion)
+        ? rawTheme
+        : 'dusk';
+  const nightGarden = store.snapshot.companion.stage >= 6;
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', activeTheme);
-  }, [activeTheme]);
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+    document.documentElement.setAttribute('data-reduced-motion', reducedMotion ? 'true' : 'false');
+    document.documentElement.setAttribute('data-night-garden', nightGarden ? 'true' : 'false');
+  }, [resolvedTheme, reducedMotion, nightGarden]);
+
+  function fireReaction(reaction: SproutReaction): void {
+    setActiveReaction(reaction);
+    if (reactionTimerRef.current !== null) window.clearTimeout(reactionTimerRef.current);
+    reactionTimerRef.current = window.setTimeout(() => {
+      setActiveReaction(null);
+    }, 850);
+  }
+
+  function applyCompanionOutcome(outcome: CompanionUpdateOutcome | null): void {
+    if (!outcome) return;
+    if (outcome.stageChanged) {
+      setActiveStageUp(true);
+      if (stageUpTimerRef.current !== null) window.clearTimeout(stageUpTimerRef.current);
+      stageUpTimerRef.current = window.setTimeout(() => {
+        setActiveStageUp(false);
+      }, 1200);
+      triggerHaptic('medium', hapticsEnabled, reducedMotion);
+    }
+    if (outcome.newlyEarnedBadges.length > 0 && outcome.newStage >= 2) {
+      setActivePetalBurst(true);
+      if (petalTimerRef.current !== null) window.clearTimeout(petalTimerRef.current);
+      petalTimerRef.current = window.setTimeout(() => {
+        setActivePetalBurst(false);
+      }, 850);
+    }
+  }
 
   if (!ready) {
     return (
@@ -86,6 +144,10 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   if (store.locked) {
     return (
       <PinLockScreen
+        stage={store.snapshot.companion.stage}
+        rings={store.snapshot.companion.rings}
+        sproutName={profile?.sproutName ?? null}
+        reducedMotion={reducedMotion}
         onUnlock={async (pin) => {
           const ok = await store.unlockWithPin(pin);
           if (ok) {
@@ -131,6 +193,9 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
 
   async function handleSaveDayLog(log: DayLog): Promise<void> {
     const prev = await store.saveDayLog(log);
+    triggerHaptic('light', hapticsEnabled, reducedMotion);
+    fireReaction('other');
+    applyCompanionOutcome(store.lastCompanionEvent);
     refresh();
     setUndoState({ date: log.date, previous: prev });
     if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);
@@ -153,7 +218,19 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   }
 
   async function handleSaveBodyLog(log: BodyLog): Promise<void> {
-    await store.saveBodyLog(log);
+    const prev = await store.saveBodyLog(log);
+    const waterChanged = JSON.stringify(prev?.water) !== JSON.stringify(log.water) && log.water;
+    const sleepChanged = JSON.stringify(prev?.sleep) !== JSON.stringify(log.sleep) && log.sleep;
+    const mealsChanged = JSON.stringify(prev?.meals) !== JSON.stringify(log.meals) && log.meals;
+    const reaction: SproutReaction = waterChanged
+      ? 'water'
+      : sleepChanged
+        ? 'sleep'
+        : mealsChanged
+          ? 'meal'
+          : 'other';
+    fireReaction(reaction);
+    applyCompanionOutcome(store.lastCompanionEvent);
     refresh();
   }
 
@@ -218,16 +295,23 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             profile={profile}
             dayLog={store.getDayLog(selectedDate)}
             dayLogs={store.snapshot.dayLogs}
+            bodyLogs={store.snapshot.bodyLogs}
             decisions={store.snapshot.decisions}
             forecasts={store.snapshot.forecasts}
             medicines={store.snapshot.medicines}
             verdicts={store.snapshot.verdicts}
             watchItems={store.snapshot.watchItems}
             visits={store.snapshot.visits}
+            companion={store.snapshot.companion}
+            activeReaction={activeReaction}
+            activePetalBurst={activePetalBurst}
+            activeStageUp={activeStageUp}
+            reducedMotion={reducedMotion}
             onChangeDate={(date) => setSelectedDate(date)}
             onSaveDayLog={handleSaveDayLog}
             onSaveDecision={async (dec: Decision) => {
               await store.saveDecision(dec);
+              applyCompanionOutcome(store.lastCompanionEvent);
               refresh();
             }}
             onDismissEvent={async (verdictId) => {
@@ -244,6 +328,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             }}
             onAnswerWatchItem={async (watchId, answers) => {
               await store.answerWatchCheck(watchId, answers);
+              applyCompanionOutcome(store.lastCompanionEvent);
               refresh();
             }}
             onSaveMedicine={async (entry: MedicineEntry) => {
@@ -252,6 +337,11 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             }}
             onSaveVisit={async (visit: DoctorVisit) => {
               await store.saveVisit(visit);
+              refresh();
+            }}
+            onOpenWeeklyReview={async () => {
+              const out = await store.openWeeklyReview(today, nowIso);
+              applyCompanionOutcome(out);
               refresh();
             }}
             onOpenGetHelp={() => setGetHelpOpen(true)}
@@ -302,12 +392,14 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             watchItems={store.snapshot.watchItems}
             visits={store.snapshot.visits}
             meta={store.snapshot.meta}
+            companion={store.snapshot.companion}
             onEditDay={(date) => {
               setSelectedDate(date);
               setTab('today');
             }}
             onSaveDecision={async (dec: Decision) => {
               await store.saveDecision(dec);
+              applyCompanionOutcome(store.lastCompanionEvent);
               refresh();
             }}
             onDeleteDecision={async (id) => {
@@ -326,7 +418,13 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               await store.dismissEventCard(verdictId);
               refresh();
             }}
-            onOpenDoctorFile={() => setDoctorFileOpen(true)}
+            onOpenDoctorFile={() => {
+              void store.markDoctorFileCreated(today).then((out) => {
+                applyCompanionOutcome(out);
+                refresh();
+              });
+              setDoctorFileOpen(true);
+            }}
             onQuickExportBackup={() => setTab('settings')}
             onSnoozeBackup={async () => {
               await store.snoozeBackupNudge();
@@ -343,6 +441,14 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             profile={profile}
             dayLogs={store.snapshot.dayLogs}
             bodyLogs={store.snapshot.bodyLogs}
+            companion={store.snapshot.companion}
+            mood={deriveSproutMood({
+              today,
+              dayLogs: store.snapshot.dayLogs,
+              companion: store.snapshot.companion,
+            })}
+            activeReaction={activeReaction}
+            reducedMotion={reducedMotion}
             onChangeDate={(date) => setSelectedDate(date)}
             onSaveBodyLog={handleSaveBodyLog}
             onSaveStress={handleSaveStress}
@@ -353,12 +459,17 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           <SettingsScreen
             today={today}
             profile={profile}
+            companion={store.snapshot.companion}
             onSaveProfile={handleSaveProfile}
             onSetPin={async (pin) => {
               await store.setPin(pin);
               refresh();
             }}
-            onExportBackup={(passphrase) => store.exportBackup(passphrase)}
+            onExportBackup={(passphrase) => store.exportBackup(passphrase).then((res) => {
+              applyCompanionOutcome(store.lastCompanionEvent);
+              refresh();
+              return res;
+            })}
             onInspectBackup={(raw) => store.inspectBackup(raw)}
             onRestoreBackup={async (raw, passphrase) => {
               await store.restoreBackup(raw, passphrase);
@@ -455,6 +566,12 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         watchItems={store.snapshot.watchItems}
         forecasts={store.snapshot.forecasts}
         onDownload={(filename, content, mime) => store.downloadFile(filename, content, mime)}
+        onDoctorFileCreated={() => {
+          void store.markDoctorFileCreated(today).then((out) => {
+            applyCompanionOutcome(out);
+            refresh();
+          });
+        }}
         onClose={() => setDoctorFileOpen(false)}
       />
     </div>

@@ -33,6 +33,7 @@ interface DoctorFileSheetProps {
   watchItems?: readonly WatchItem[];
   forecasts?: readonly Forecast[];
   onDownload: (filename: string, content: string, mimeType: string) => void;
+  onDoctorFileCreated?: () => void;
   onClose: () => void;
 }
 
@@ -50,6 +51,7 @@ export function DoctorFileSheet({
   watchItems = [],
   forecasts = [],
   onDownload,
+  onDoctorFileCreated,
   onClose,
 }: DoctorFileSheetProps) {
   const [range, setRange] = useState<DoctorFileRange>('3m');
@@ -269,13 +271,14 @@ export function DoctorFileSheet({
           type="button"
           class="btn btn-primary"
           style={{ width: '100%' }}
-          onClick={() =>
+          onClick={() => {
+            onDoctorFileCreated?.();
             onDownload(
               output.filename,
               output.content,
               format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8',
-            )
-          }
+            );
+          }}
         >
           Save {output.filename}
         </button>

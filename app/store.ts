@@ -1,3 +1,15 @@
+import {
+  awardCompanionRing,
+  buildWeeklyReviewSummary,
+  deriveSproutMood,
+  getStageDefinition,
+  isCheckInDayLog,
+  isPopulatedBodyLog,
+  isSundayEvening,
+  reconcileCompanionState,
+  type StageDefinition,
+  type WeeklyReviewSummary,
+} from '../core/companion/companion';
 import { deriveCycles } from '../core/cycles/cycles';
 import { classifyEpisodes } from '../core/cycles/episodes';
 import { analyzeLifestylePatterns, type LifestyleAnalysisResult } from '../core/insights/lifestyle';
@@ -8,12 +20,16 @@ import {
   type AppSnapshotData,
   type BackupMeta,
   type BodyLog,
+  type CompanionStage,
+  type CompanionState,
   type DateKey,
   type DayLog,
   type Decision,
   type DoctorVisit,
   type MedicineEntry,
   type Profile,
+  type RingSource,
+  type SproutMood,
   type Stamp,
   type StandingFlagId,
   type Verdict,
@@ -103,6 +119,8 @@ export function makeDefaultProfile(nowIso: Stamp = getLocalStamp()): Profile {
     locale: 'en',
     region: 'PK',
     disclaimerAcceptedAt: null,
+    reducedMotion: false,
+    haptics: true,
   };
 }
 
@@ -237,10 +255,80 @@ export function computeStep4Snapshot(
   };
 }
 
+export function computeStep5Snapshot(
+  snapshot: AppSnapshotData,
+  selectedDate: DateKey,
+  today: DateKey,
+  nowIso: Stamp,
+): ReturnType<typeof computeStep4Snapshot> & {
+  mood: SproutMood;
+  stageInfo: StageDefinition;
+  sundayEvening: boolean;
+  weeklyReview: WeeklyReviewSummary;
+} {
+  const step4 = computeStep4Snapshot(snapshot, selectedDate, today, nowIso);
+  const mood = deriveSproutMood({
+    today,
+    dayLogs: snapshot.dayLogs,
+    companion: snapshot.companion,
+  });
+  const stageInfo = getStageDefinition(snapshot.companion.stage);
+  const sundayEvening = isSundayEvening(today, nowIso);
+  const patternText =
+    step4.lifestyle.patterns[0]?.statement ??
+    (step4.prediction.leadIn.status === 'learned'
+      ? `Spotting or cramps appeared around ${step4.prediction.leadIn.medianOffsetDays} days before flow in ${step4.prediction.leadIn.cyclesWithSignal} cycles.`
+      : null);
+  const weeklyReview = buildWeeklyReviewSummary({
+    today,
+    dayLogs: snapshot.dayLogs,
+    companion: snapshot.companion,
+    confidenceScore: step4.prediction.confidence.score,
+    patternText,
+  });
+
+  return {
+    ...step4,
+    mood,
+    stageInfo,
+    sundayEvening,
+    weeklyReview,
+  };
+}
+
+export interface CompanionUpdateOutcome {
+  awarded: 0 | 1;
+  stageChanged: boolean;
+  newStage: CompanionStage;
+  newlyEarnedBadges: string[];
+  newlyUnlockedThemes: string[];
+}
+
+function hasNewFollowUpAnswer(prev: DayLog | null, next: DayLog): boolean {
+  if (next.dangerAnswered === true && prev?.dangerAnswered !== true) return true;
+  if (next.changeEvery !== undefined && prev?.changeEvery !== next.changeEvery) return true;
+  if (next.soakedPerHour !== undefined && prev?.soakedPerHour !== next.soakedPerHour) return true;
+  if (next.clots !== undefined && prev?.clots !== next.clots) return true;
+  if (next.pregnancyChance !== undefined && prev?.pregnancyChance !== next.pregnancyChance) return true;
+  if (next.stoolBlood !== undefined && prev?.stoolBlood !== next.stoolBlood) return true;
+  if (
+    next.pain &&
+    next.pain.sites.length > 0 &&
+    (prev?.pain?.sites.length ?? 0) === 0
+  ) {
+    return true;
+  }
+  if (next.pain?.reliefHelped !== undefined && prev?.pain?.reliefHelped !== next.pain.reliefHelped) {
+    return true;
+  }
+  return false;
+}
+
 export class MoonrootStore {
   readonly storage: IndexedDBStorage;
   snapshot: AppSnapshotData;
   locked = false;
+  lastCompanionEvent: CompanionUpdateOutcome | null = null;
 
   constructor(storage = new IndexedDBStorage()) {
     this.storage = storage;
@@ -270,6 +358,7 @@ export class MoonrootStore {
     this.locked = this.snapshot.profile?.lock.type === 'pin';
     if (this.snapshot.profile && !this.locked) {
       await this.syncForecasts();
+      await this.syncCompanionState();
     }
   }
 
@@ -283,6 +372,7 @@ export class MoonrootStore {
     if (ok) {
       this.locked = false;
       await this.syncForecasts();
+      await this.syncCompanionState();
     }
     return ok;
   }
@@ -307,7 +397,103 @@ export class MoonrootStore {
     return this.snapshot.bodyLogs.find((b) => b.date === date) ?? null;
   }
 
-  async saveBodyLog(log: BodyLog): Promise<BodyLog | null> {
+  private async updateCompanionInternal(
+    sources: readonly RingSource[],
+    actionDate: DateKey,
+    extra: { doctorFileCreated?: boolean } = {},
+  ): Promise<CompanionUpdateOutcome> {
+    const prev = this.snapshot.companion;
+    let working = prev;
+    let totalAwarded: 0 | 1 = 0;
+    let anyStageChanged = false;
+    const unlockedSet = new Set<string>();
+
+    for (const source of sources) {
+      const res = awardCompanionRing(working, source, actionDate);
+      working = res.next;
+      if (res.awarded === 1) totalAwarded = 1;
+      if (res.stageChanged) anyStageChanged = true;
+      for (const theme of res.newlyUnlockedThemes) {
+        unlockedSet.add(theme);
+      }
+    }
+
+    const episodes = classifyEpisodes(
+      this.snapshot.dayLogs,
+      this.snapshot.decisions,
+      actionDate,
+    );
+    const cycles = deriveCycles(episodes, this.snapshot.decisions, actionDate);
+    const lifestyle = analyzeLifestylePatterns({
+      today: actionDate,
+      dayLogs: this.snapshot.dayLogs,
+      bodyLogs: this.snapshot.bodyLogs,
+    });
+    const prediction = computeLivePrediction({
+      today: actionDate,
+      profile: this.snapshot.profile ?? makeDefaultProfile(),
+      cycles,
+      dayLogs: this.snapshot.dayLogs,
+      decisions: this.snapshot.decisions,
+      existingForecasts: this.snapshot.forecasts,
+    });
+
+    const reconciled = reconcileCompanionState({
+      companion: working,
+      today: actionDate,
+      dayLogs: this.snapshot.dayLogs,
+      bodyLogs: this.snapshot.bodyLogs,
+      completedCycleCount: cycles.cycles.length,
+      hasPattern: lifestyle.patterns.length > 0 || prediction.leadIn.status === 'learned',
+      meta: this.snapshot.meta,
+      doctorFileCreated: extra.doctorFileCreated ?? working.doctorFileCreated,
+    });
+
+    const newlyEarnedBadges = reconciled.badges.filter((b) => !prev.badges.includes(b));
+    if (JSON.stringify(reconciled) !== JSON.stringify(prev)) {
+      await this.storage.saveCompanion(reconciled);
+      this.snapshot = { ...this.snapshot, companion: reconciled };
+    }
+
+    const outcome: CompanionUpdateOutcome = {
+      awarded: totalAwarded,
+      stageChanged: anyStageChanged || reconciled.stage > prev.stage,
+      newStage: reconciled.stage,
+      newlyEarnedBadges,
+      newlyUnlockedThemes: [...unlockedSet],
+    };
+    this.lastCompanionEvent = outcome;
+    return outcome;
+  }
+
+  async syncCompanionState(today: DateKey = getLocalDateKey()): Promise<CompanionUpdateOutcome> {
+    return this.updateCompanionInternal([], today);
+  }
+
+  async markDoctorFileCreated(today: DateKey = getLocalDateKey()): Promise<CompanionUpdateOutcome> {
+    return this.updateCompanionInternal([], today, { doctorFileCreated: true });
+  }
+
+  async openWeeklyReview(
+    today: DateKey = getLocalDateKey(),
+    nowIso: Stamp = getLocalStamp(),
+  ): Promise<CompanionUpdateOutcome> {
+    const step4 = computeStep4Snapshot(this.snapshot, today, today, nowIso);
+    const confidenceScore = step4.prediction.confidence.score;
+    const outcome = await this.updateCompanionInternal(['weekly-review'], today);
+    const nextComp: CompanionState = {
+      ...this.snapshot.companion,
+      lastWeeklyReviewDate: today,
+      lastWeeklyConfidence: confidenceScore,
+    };
+    if (JSON.stringify(nextComp) !== JSON.stringify(this.snapshot.companion)) {
+      await this.storage.saveCompanion(nextComp);
+      this.snapshot = { ...this.snapshot, companion: nextComp };
+    }
+    return outcome;
+  }
+
+  async saveBodyLog(log: BodyLog, actionToday: DateKey = getLocalDateKey()): Promise<BodyLog | null> {
     const previous = this.getBodyLog(log.date);
     await this.storage.saveBodyLog(log);
     const others = this.snapshot.bodyLogs.filter((b) => b.date !== log.date);
@@ -315,6 +501,11 @@ export class MoonrootStore {
       ...this.snapshot,
       bodyLogs: [...others, log].sort((a, b) => a.date.localeCompare(b.date)),
     };
+    if (isPopulatedBodyLog(log)) {
+      await this.updateCompanionInternal(['body'], actionToday);
+    } else {
+      await this.syncCompanionState(actionToday);
+    }
     return previous;
   }
 
@@ -488,11 +679,12 @@ export class MoonrootStore {
       };
       await this.syncTriageState(getLocalDateKey(), nowIso);
       await this.syncForecasts(getLocalDateKey());
+      await this.syncCompanionState(getLocalDateKey());
     }
     return added;
   }
 
-  async saveDayLog(log: DayLog): Promise<DayLog | null> {
+  async saveDayLog(log: DayLog, actionToday: DateKey = getLocalDateKey()): Promise<DayLog | null> {
     const previous = this.getDayLog(log.date);
     await this.storage.saveDayLog(log);
     const others = this.snapshot.dayLogs.filter((d) => d.date !== log.date);
@@ -500,8 +692,16 @@ export class MoonrootStore {
       ...this.snapshot,
       dayLogs: [...others, log].sort((a, b) => a.date.localeCompare(b.date)),
     };
-    await this.syncTriageState(getLocalDateKey(), log.updatedAt);
-    await this.syncForecasts(getLocalDateKey());
+    await this.syncTriageState(actionToday, log.updatedAt);
+    await this.syncForecasts(actionToday);
+    const sources: RingSource[] = [];
+    if (isCheckInDayLog(log)) {
+      sources.push('checkin');
+    }
+    if (log.filledFrom !== 'approximate' && hasNewFollowUpAnswer(previous, log)) {
+      sources.push('followup');
+    }
+    await this.updateCompanionInternal(sources, actionToday);
     return previous;
   }
 
@@ -538,6 +738,7 @@ export class MoonrootStore {
     };
     await this.syncTriageState(getLocalDateKey(), decision.at);
     await this.syncForecasts(getLocalDateKey());
+    await this.syncCompanionState(getLocalDateKey());
   }
 
   async deleteDecision(id: string): Promise<void> {
@@ -604,6 +805,7 @@ export class MoonrootStore {
       ),
     };
     await this.syncTriageState(getLocalDateKey(), nowIso);
+    await this.updateCompanionInternal(['followup'], getLocalDateKey());
   }
 
   async saveMedicine(entry: MedicineEntry): Promise<void> {
@@ -651,6 +853,7 @@ export class MoonrootStore {
     };
     await this.storage.saveMeta(nextMeta);
     this.snapshot = { ...current, meta: nextMeta };
+    await this.syncCompanionState(today);
     return { filename: `moonroot-backup-${today}.json`, json };
   }
 
@@ -678,6 +881,7 @@ export class MoonrootStore {
     this.locked = false;
     await this.syncTriageState();
     await this.syncForecasts();
+    await this.syncCompanionState();
     return restored;
   }
 

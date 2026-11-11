@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { getStageDefinition } from '../../core/companion/companion';
 import { analyzeLifestylePatterns } from '../../core/insights/lifestyle';
-import type { BodyLog, DateKey, DayLog, Profile, Stamp } from '../../core/model/types';
+import type {
+  BodyLog,
+  CompanionState,
+  DateKey,
+  DayLog,
+  Profile,
+  SproutMood,
+  SproutReaction,
+  Stamp,
+} from '../../core/model/types';
+import { Sprout } from '../companion/Sprout';
 
 interface BodyScreenProps {
   today: DateKey;
@@ -9,6 +20,10 @@ interface BodyScreenProps {
   profile: Profile;
   dayLogs: readonly DayLog[];
   bodyLogs: readonly BodyLog[];
+  companion?: CompanionState;
+  mood?: SproutMood;
+  activeReaction?: SproutReaction | null;
+  reducedMotion?: boolean;
   onChangeDate: (date: DateKey) => void;
   onSaveBodyLog: (log: BodyLog) => Promise<void>;
   onSaveStress: (date: DateKey, stress: 1 | 2 | 3 | 4 | 5 | undefined) => Promise<void>;
@@ -55,6 +70,10 @@ export function BodyScreen({
   profile,
   dayLogs,
   bodyLogs,
+  companion,
+  mood = 'calm',
+  activeReaction = null,
+  reducedMotion = false,
   onChangeDate,
   onSaveBodyLog,
   onSaveStress,
@@ -223,8 +242,36 @@ export function BodyScreen({
   const waterPresets =
     waterUnit === 'glasses' ? [2, 4, 6, 8, 10] : [500, 1000, 1500, 2000, 2500];
 
+  const reactionShown = companion && companion.stage >= 1 ? activeReaction : null;
+  const stageDef = companion ? getStageDefinition(companion.stage) : null;
+
   return (
     <div>
+      {companion && stageDef && (
+        <section class="card sprout-card" aria-label="Body companion status">
+          <Sprout
+            stage={companion.stage}
+            mood={mood}
+            rings={companion.rings}
+            name={profile.sproutName}
+            reaction={reactionShown}
+            reducedMotion={reducedMotion}
+            size={84}
+          />
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>
+              {profile.sproutName ? `${profile.sproutName} · ` : ''}
+              {stageDef.name}
+            </div>
+            <p class="muted" style={{ margin: '4px 0 0 0' }}>
+              {companion.stage >= 1
+                ? '+1 ring for a Body log today (up to 2 rings a day).'
+                : `Reach Stage 1 (3 rings) for Body log reactions. (${companion.rings} rings)`}
+            </p>
+          </div>
+        </section>
+      )}
+
       <section class="card" aria-label="Body day picker">
         <div class="btn-row" style={{ justifyContent: 'space-between' }}>
           <label htmlFor="body-date-picker" class="field-label" style={{ margin: 0 }}>

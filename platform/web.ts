@@ -38,3 +38,31 @@ export function downloadTextFile(filename: string, content: string, mimeType = '
 export async function readFileText(file: File): Promise<string> {
   return file.text();
 }
+
+export function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+export function prefersLightTheme(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia('(prefers-color-scheme: light)').matches;
+}
+
+export function triggerHaptic(
+  kind: 'light' | 'medium',
+  enabled: boolean,
+  reducedMotion: boolean,
+): void {
+  if (!enabled || reducedMotion) return;
+  if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+  try {
+    navigator.vibrate(kind === 'medium' ? 24 : 10);
+  } catch {
+    // Ignore vibration errors in locked-down webviews
+  }
+}

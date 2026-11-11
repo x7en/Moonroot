@@ -1,7 +1,9 @@
 import { useState } from 'preact/hooks';
 import { computeStep2Snapshot, isBackupOverdue } from '../../app/store';
+import { BADGE_DEFINITIONS } from '../../core/companion/companion';
 import type {
   BackupMeta,
+  CompanionState,
   DateKey,
   DayLog,
   Decision,
@@ -24,6 +26,7 @@ interface RecordScreenProps {
   watchItems: readonly WatchItem[];
   visits: readonly DoctorVisit[];
   meta: BackupMeta;
+  companion?: CompanionState;
   onEditDay: (date: DateKey) => void;
   onSaveDecision: (decision: Decision) => Promise<void>;
   onDeleteDecision: (id: string) => Promise<void>;
@@ -46,6 +49,7 @@ export function RecordScreen({
   watchItems,
   visits,
   meta,
+  companion,
   onEditDay,
   onSaveDecision,
   onDeleteDecision,
@@ -429,6 +433,33 @@ export function RecordScreen({
             </div>
           ))
         )}
+      </section>
+
+      <section class="card" aria-label="Badges">
+        <h2 class="card-title">Badges</h2>
+        <p class="muted" style={{ marginTop: 0 }}>
+          Badges unlock once as you log and never expire.
+        </p>
+        <div class="badge-grid">
+          {BADGE_DEFINITIONS.map((badge) => {
+            const earned = companion?.badges.includes(badge.id) ?? false;
+            return (
+              <div
+                key={badge.id}
+                class={`badge-tile ${earned ? 'badge-tile-earned' : ''}`}
+                data-badge-id={badge.id}
+                data-earned={earned ? 'true' : 'false'}
+              >
+                <div style={{ fontWeight: 700 }}>
+                  {earned ? `★ ${badge.name}` : badge.name}
+                </div>
+                <div class="muted" style={{ fontSize: '0.85rem' }}>
+                  {badge.description}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
     </div>
   );

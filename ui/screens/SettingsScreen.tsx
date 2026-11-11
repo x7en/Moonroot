@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { APP_VERSION, getRegionOptions, type BackupPreview } from '../../app/store';
+import { canUseTheme, THEME_CATALOGUE } from '../../core/companion/companion';
 import { isUnder18 } from '../../core/model/dates';
-import { RULESET_VERSION, type DateKey, type Profile } from '../../core/model/types';
+import {
+  RULESET_VERSION,
+  type CompanionState,
+  type DateKey,
+  type Profile,
+} from '../../core/model/types';
 import { readFileText } from '../../platform/web';
 
 interface SettingsScreenProps {
   today: DateKey;
   profile: Profile;
+  companion?: CompanionState;
   onSaveProfile: (profile: Profile) => Promise<void>;
   onSetPin: (pin: string | null) => Promise<void>;
   onExportBackup: (passphrase?: string) => Promise<{ filename: string; json: string }>;
@@ -19,6 +26,13 @@ interface SettingsScreenProps {
 export function SettingsScreen({
   today,
   profile,
+  companion = {
+    rings: 0,
+    stage: 0,
+    unlocked: ['dusk', 'dawn', 'high-contrast'],
+    badges: [],
+    lastRingDate: null,
+  },
   onSaveProfile,
   onSetPin,
   onExportBackup,
@@ -175,23 +189,53 @@ export function SettingsScreen({
         <div class="field">
           <span class="field-label">Theme</span>
           <div class="chip-group">
-            {(
-              [
-                { value: 'dusk', label: 'Dusk (night)' },
-                { value: 'dawn', label: 'Dawn (day)' },
-                { value: 'high-contrast', label: 'High contrast' },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                class="chip"
-                aria-pressed={profile.theme === opt.value}
-                onClick={() => void patchProfile({ theme: opt.value })}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {THEME_CATALOGUE.map((opt) => {
+              const unlocked = canUseTheme(opt.id, companion);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  class="chip"
+                  disabled={!unlocked}
+                  aria-pressed={profile.theme === opt.id}
+                  title={opt.note}
+                  onClick={() => {
+                    if (unlocked) void patchProfile({ theme: opt.id });
+                  }}
+                >
+                  {unlocked ? opt.label : `${opt.label} (Stage ${opt.requiredStage})`}
+                </button>
+              );
+            })}
+          </div>
+          <p class="muted" style={{ margin: '6px 0 0 0' }}>
+            Dusk, Dawn, Match phone, and High contrast are always unlocked.
+          </p>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Motion and touch</span>
+          <div class="chip-group">
+            <label class="chip">
+              <input
+                type="checkbox"
+                checked={Boolean(profile.reducedMotion)}
+                onChange={(e) =>
+                  void patchProfile({ reducedMotion: (e.target as HTMLInputElement).checked })
+                }
+              />
+              <span>Reduce motion</span>
+            </label>
+            <label class="chip">
+              <input
+                type="checkbox"
+                checked={profile.haptics !== false}
+                onChange={(e) =>
+                  void patchProfile({ haptics: (e.target as HTMLInputElement).checked })
+                }
+              />
+              <span>Light haptics</span>
+            </label>
           </div>
         </div>
 
@@ -493,8 +537,8 @@ export function SettingsScreen({
           does not diagnose.
         </p>
         <p class="muted" style={{ marginBottom: 0 }}>
-          Step 2 build: check-in intelligence, cycle derivation, watch checks and clinical review
-          doctor summary active on-device.
+          Companion, ovulation tracking, lifestyle patterns, check-in intelligence, and clinical
+          doctor summary run offline on this device.
         </p>
       </section>
 

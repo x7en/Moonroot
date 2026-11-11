@@ -154,5 +154,13 @@
     "fastingToday": "Fasting today",
     "fastingNote": "Fasting days stay out of water and meal patterns.",
     "notProof": "This is a pattern, not proof of cause."
+  },
+  "companion": {
+    "moodBright": "Bright",
+    "moodCalm": "Calm",
+    "moodSleepy": "Resting quietly",
+    "moodWelcome": "Welcome back",
+    "weeklyReviewTitle": "Sunday weekly review",
+    "weeklyReviewOpen": "Open weekly review"
   }
 }

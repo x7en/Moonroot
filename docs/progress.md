@@ -1,7 +1,7 @@
 # Moonroot Progress
 
 ## Current phase
-Release 2 started — Step 4 (Body and ovulation) implemented and verified
+Release 2 progressing — Step 5 (Companion) implemented and verified
 
 ## What is complete
 - Added `SPEC.md` at the repository root from the final specification (8 November 2026).
@@ -24,6 +24,10 @@ Release 2 started — Step 4 (Body and ovulation) implemented and verified
   - **Lifestyle pattern analyzer** (`core/insights/lifestyle.ts`, `tests/core/lifestyleInsights.test.ts`): runs strictly on days where both cause day and outcome day have `flow === 'none'` (excluding `fasting` days from water/meal comparisons), checks up to 20 predefined cause->next-day-outcome pairs across sleep, water, meals, stool, stress, exercise, and caffeine vs cramps, headache, mood, and energy (`>= 14` days per group, `>= 6` events, Cohen's `d >= 0.65`, Welch `|t| >= 3.85`, same-direction split-half consistency, 60-day expiry, top 3 patterns), producing 0 false discoveries across 40 uncorrelated synthetic histories (800 hypothesis tests).
   - **Doctor file Parts 6, 8, 9, 11 & Day CSV updates** (`core/report/doctorFile.ts`, `core/report/csv.ts`, `tests/core/doctorFile.test.ts`, `tests/core/csvAndDoctorGolden.test.ts`): added lifestyle patterns to Part 6, 30-day & 90-day body/lifestyle averages (`glasses` aware) to Part 8, conditional Part 9 (omitted when unlogged; includes 40+ BBT no-shift doctor note), `STD-01` + acne/hair Part 11 question, `includeBody` toggle on doctor file + Day CSV, and `lifestylePatterns`/`ovulationSummary` in the machine-readable JSON block.
   - **Body tab, Today ovulation signals, Cycle ovulation card, Settings units & store wiring** (`app/store.ts`, `ui/screens/BodyScreen.tsx`, `ui/screens/TodayScreen.tsx`, `ui/screens/CycleScreen.tsx`, `ui/screens/SettingsScreen.tsx`, `ui/components/DoctorFileSheet.tsx`, `ui/App.tsx`, `locales/en.json`, `tests/ui/step4App.test.tsx`): added 5-entry bottom nav (`Today`, `Cycle`, `Log`, `Record`, `Body`), plain-number Body cards (Sleep, Water `ml`/`glasses`, Meals + neutral `"Fasting today"`, Bristol 1–7 Digestion, synced `1–5` Stress, Exercise, `1–5` Energy, Skin/Hair, unlocked lifestyle patterns), optional `Ovulation signals` on Today (`°C`/`°F` conversion, LH, mucus), Cycle `Ovulation` card with `"This app is not a contraception method."` banner and `"Ways to find out"` modal, Water unit selector in Settings, serialized draft queues on `BodyScreen`/`TodayScreen`/`SettingsScreen`, and `axe-core` Step 4 UI verification.
+- Completed Step 5 (Companion):
+  - **Pure companion engine** (`core/companion/companion.ts`, `core/model/types.ts`, `tests/core/companion.test.ts`): implemented `STAGE_DEFINITIONS` across all 7 stages (`0`, `3`, `10`, `25`, `50`, `90`, `150` rings — Seed -> Sprout -> Seedling -> Young plant -> Budding -> Blooming -> Moonflower), `THEME_CATALOGUE` (Dusk, Dawn, and High Contrast always unlocked; Meadow at Stage 2, Ocean at Stage 3, Rose at Stage 4, Midnight at Stage 5), all 8 permanent `BADGE_DEFINITIONS` (`first-light`, `three-this-week`, `first-full-cycle`, `record-keeper`, `backed-up`, `body-scan`, `pattern-found`, `steady-roots`), hard daily 2-ring cap (`awardCompanionRing` across check-in, Body log, follow-up answer, and Sunday Weekly Review), monotonic Law-of-the-Sprout reconciliation (rings never decrease and earned badges never reset on edits, Undo, or deletions), 4-mood derivation (`bright`, `calm`, `sleepy` after >= 3 days, single-visit `welcome` unfurl on check-in after sleepy), tap messages (`pickTapMessage`), and 20-second Sunday evening `WeeklyReviewSummary` builder (`buildWeeklyReviewSummary`).
+  - **WCAG AA themes, reduced motion & face-free Sprout SVG** (`ui/companion/Sprout.tsx`, `ui/styles/tokens.css`, `ui/styles/base.css`, `tests/core/themeContrast.test.ts`): built `<Sprout>` rendering all 7 botanical stages and 4 moods solely via leaf posture and gentle glow (zero face, zero wilting/brown states), transient `< 1s` reaction overlays (Water raindrops, Sleep moonbeam, Meal sunbeam, Other sparkle), `Night Garden` glow boost at `21:00+` (`[data-night-garden='true']`), `prefers-reduced-motion` + Settings `Reduce motion` override disabling sway/reaction animations and switching to a static glow, and WCAG-verified `meadow`, `ocean`, `rose`, and AMOLED `#000000` `midnight` palettes (`>= 6.5:1` text contrast, `>= 4.3:1` accent contrast).
+  - **Store, screens & privacy PIN lock** (`platform/web.ts`, `app/store.ts`, `ui/App.tsx`, `ui/screens/TodayScreen.tsx`, `ui/screens/BodyScreen.tsx`, `ui/screens/RecordScreen.tsx`, `ui/screens/SettingsScreen.tsx`, `ui/screens/PinLockScreen.tsx`, `ui/components/DoctorFileSheet.tsx`, `locales/en.json`, `tests/ui/step5App.test.tsx`): wired monotonic ring/badge updates across live saves, backup exports, and Doctor file creation; kept normal Today check-ins to `<= 4` taps (`Flow` -> `Pain` -> `Any of these? None -> Verdict + 1 ring`); added `<Sprout>` tap card + Sunday evening Weekly Review card on Today; added `Badges` 8-tile grid on Record; added theme lock hints + `Reduce motion` / `Light haptics` toggles in Settings; replaced any text health clues on `PinLockScreen` with a calm `<Sprout>`; and verified all Step 5 UI flows + `axe-core` zero-violation checks.
 
 ## Approved design-freeze additions and medical interpretations (unreviewed)
 1. **Data model additions** (`core/model/types.ts`): `'shoulder-tip'` `PainSite`, `pregnancyChance`, `stoolBlood`, `'unsure'` `reliefHelped`, `weightChange`, and `dangerAnswered?: boolean`.
@@ -38,17 +42,16 @@ Release 2 started — Step 4 (Body and ovulation) implemented and verified
 - **`YEL-02` & `ORG-14` pain upper cap removed (`4+` instead of `4–7`)**: Required to satisfy exhaustive `Law 1` for `pain >= 8` with `reliefHelped = 'none-taken'`, marked `(changed)` / `unreviewed` / `Std` pending clinical sign-off.
 - **Caffeine intake field mapping**: `BodyScreen` captures caffeine via the Meals `"Caffeine"` tag (`meals.tags`) using `BodyLog` without modifying frozen `core/model/types.ts`.
 
-## Step 4 Gate Verification
+## Step 5 Gate Verification
 - **Simulation Gate**: `npm run sim` — all 6 acceptance criteria passed across 3 x 450 synthetic people x 16 cycles + real/random lead-in simulations.
 - **Rules & Case Cards Export**: `npm run rules:export` — `docs/clinical-review.md` and `docs/case-cards.md` up to date.
 - **Typecheck**: `tsc -p tsconfig.core.json --noEmit && tsc -p tsconfig.json --noEmit` — passed (0 errors).
-- **Lint & Guardrails**: `eslint .`, `depcruise` (86 modules, 310 deps), `lint:copy` — passed (0 violations).
-- **Tests & Coverage**: `vitest run --coverage` — **20/20 test files, 226/226 tests passed** (`100%` Functions and `100%` Lines across `core/cycles/**`, `core/ovulation/**`, `core/predict/**`, and `core/triage/**`; `100%` Functions and `95.56%` Lines across `core/insights/**`; golden snapshots + Step 1–4 `axe-core` UI tests passed).
-- **Build**: `npm run build` — passed (`dist/` PWA with 14 precached entries).
+- **Lint & Guardrails**: `eslint .`, `depcruise` (91 modules, 343 deps), `lint:copy` — passed (0 violations).
+- **Tests & Coverage**: `vitest run --coverage` — **23/23 test files, 239/239 tests passed** (`100%` Functions and `100%` Lines across `core/companion/**`, `core/cycles/**`, `core/ovulation/**`, `core/predict/**`, and `core/triage/**`; `100%` Functions and `95.56%` Lines across `core/insights/**`; WCAG AA theme contrast test across all 7 themes + Step 1–5 `axe-core` UI tests passed).
+- **Build**: `npm run build` — passed (`dist/` PWA with 14 precached entries, `83.21 kB` gzipped JS).
 
-## What is left (Release 2 — Steps 5 to 7)
-- Step 5: Companion sprout SVG (`ui/companion/Sprout.tsx`), rings, badges, and theme unlocks.
+## What is left (Release 2 — Steps 6 to 7)
 - Step 6: Graphs screen, Ask your record (`core/ask`), Urdu RTL (`ur.json`), and Android Capacitor shell.
 - Step 7: Final clinical review completion, Playwright real-browser E2E + screenshots, and release signing.
 
-NEXT ACTION: Step 4 is complete and verified; ready to begin Step 5 (Companion) when requested.
+NEXT ACTION: Step 5 is complete and verified; ready to begin Step 6 (Graphs, Ask your record, Urdu RTL, Android wrapper) when requested.

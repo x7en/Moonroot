@@ -145,6 +145,8 @@ export interface Profile {
   locale: string;
   region: string; // picks emergency numbers, for example 'PK'
   disclaimerAcceptedAt: Stamp | null;
+  reducedMotion?: boolean;
+  haptics?: boolean;
 }
 
 export interface DayLog {
@@ -294,12 +296,23 @@ export interface MedicineEntry {
   updatedAt: Stamp;
 }
 
+export type RingSource = 'checkin' | 'body' | 'followup' | 'weekly-review';
+export type SproutMood = 'bright' | 'calm' | 'sleepy' | 'welcome';
+export type SproutReaction = 'water' | 'sleep' | 'meal' | 'other';
+export type CompanionStage = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
 export interface CompanionState {
   rings: number;
-  stage: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  stage: CompanionStage;
   unlocked: string[];
   badges: string[];
   lastRingDate: DateKey | null;
+  dailyRings?: { date: DateKey; sources: RingSource[] };
+  welcomeDate?: DateKey | null;
+  lastCheckInDate?: DateKey | null;
+  lastWeeklyReviewDate?: DateKey | null;
+  lastWeeklyConfidence?: number | null;
+  doctorFileCreated?: boolean;
 }
 
 export interface BackupMeta {
