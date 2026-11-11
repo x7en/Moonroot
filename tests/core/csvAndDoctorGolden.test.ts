@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addDays } from '../../core/model/dates';
 import type {
+  BodyLog,
   DayLog,
   Decision,
   DoctorVisit,
@@ -359,5 +360,136 @@ describe('Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tab
     expect(doc).toMatchSnapshot();
     expect(dayCsv).toMatchSnapshot();
     expect(cycleCsv).toMatchSnapshot();
+  });
+
+  it('includes Step 4 Part 6 lifestyle patterns, Part 8 30d/90d body averages, Part 9 ovulation + 40+ BBT no-shift note, and STD-01 acne/hair question, while omitting Part 9 when unlogged', () => {
+    const today = '2026-10-30';
+    // 1. When no ovulation signals logged, Part 9 MUST be omitted
+    const f1 = buildRegularFixture();
+    const docWithoutOv = buildDoctorFile({
+      today: f1.today,
+      appVersion: '0.1.0',
+      profile: f1.profile,
+      dayLogs: f1.dayLogs,
+      medicines: f1.medicines,
+      visits: f1.visits,
+      options: {
+        range: '6m',
+        format: 'md',
+        includeNotes: true,
+        includeMedicines: true,
+        includeIntimacy: false,
+      },
+    });
+    expect(docWithoutOv.content).toContain('## 8. Body and lifestyle');
+    expect(docWithoutOv.content).not.toContain('## 9. Ovulation signals');
+
+    // 2. Full Step 4 Fixture 4: irregular cycles (>8d variation -> STD-01), acne/hair,
+    //    36 non-bleeding days with sleep->cramps pattern, and 42 BBT readings with no shift
+    const dayLogs: DayLog[] = [];
+    const bodyLogs: BodyLog[] = [];
+    // 6 cycles spanning >9 days variation -> fires STD-01 cleanly:
+    // 2026-03-01 (+22) -> 2026-03-23 (+35) -> 2026-04-27 (+24) -> 2026-05-21 (+36) -> 2026-06-26 (+26) -> 2026-07-22 (+36) -> 2026-08-27
+    const starts = [
+      '2026-03-01',
+      '2026-03-23',
+      '2026-04-27',
+      '2026-05-21',
+      '2026-06-26',
+      '2026-07-22',
+      '2026-08-27',
+    ];
+    for (const s of starts) {
+      dayLogs.push(day(s, { flow: 'medium' }), day(addDays(s, 1), { flow: 'medium' }));
+    }
+    // 42 consecutive non-bleeding days from Sep 18 to Oct 29 with alternating short/good sleep
+    // driving cramps and stable oscillating BBT (no 3-over-6 shift!)
+    for (let i = 0; i < 42; i += 1) {
+      const date = addDays('2026-09-18', i);
+      const prevShort = i > 0 && (i - 1) % 2 === 0;
+      const todayShort = i % 2 === 0;
+      dayLogs.push(
+        day(date, {
+          flow: 'none',
+          pain: { level: prevShort ? 4 : 1, sites: ['lower-middle'] },
+          symptoms: prevShort ? ['cramps'] : [],
+          context: { stress: todayShort ? 4 : 2 },
+          fertility: {
+            bbt: i % 2 === 0 ? 36.4 : 36.52,
+            lh: i === 25 ? 'negative' : undefined,
+          },
+        }),
+      );
+      bodyLogs.push({
+        date,
+        sleep: { hours: todayShort ? 5 : 8, quality: todayShort ? 1 : 3 },
+        water: { ml: 2000 },
+        meals: { pattern: 'regular', tags: ['balanced'] },
+        stool: { count: 1, bristol: 4 },
+        exercise: { minutes: 30, effort: 'moderate' },
+        energy: 4,
+        skin: i === 20 ? { acne: 2, hair: 'shedding' } : undefined,
+        updatedAt: `${date}T21:00:00+05:00`,
+      });
+    }
+
+    const step4Doc = buildDoctorFile({
+      today,
+      appVersion: '0.1.0',
+      profile: baseProfile({
+        selfRegularity: 'irregular',
+        units: { temperature: 'F', water: 'glasses' },
+      }),
+      dayLogs,
+      bodyLogs,
+      medicines: [],
+      visits: [],
+      options: {
+        range: '6m',
+        format: 'md',
+        includeBody: true,
+        includeNotes: true,
+        includeMedicines: true,
+        includeIntimacy: false,
+      },
+    });
+
+    expect(step4Doc.content).toContain('## 6. Patterns the app found');
+    expect(step4Doc.content).toContain('On days after under 6 hours of sleep');
+    expect(step4Doc.content).toContain('This is a pattern, not proof of cause.');
+    expect(step4Doc.content).toContain('## 8. Body and lifestyle');
+    expect(step4Doc.content).toContain('glasses');
+    expect(step4Doc.content).toContain('## 9. Ovulation signals');
+    expect(step4Doc.content).toContain('42 non-illness days of basal body temperature logging recorded with no 3-over-6 shift');
+    expect(step4Doc.content).toContain('I also notice acne or hair changes. Should my hormone levels be checked?');
+
+    // Verify includeBody: false omits Part 8 and blanks body columns in Day CSV
+    const noBodyDoc = buildDoctorFile({
+      today,
+      appVersion: '0.1.0',
+      profile: baseProfile(),
+      dayLogs,
+      bodyLogs,
+      medicines: [],
+      visits: [],
+      options: {
+        range: '6m',
+        format: 'md',
+        includeBody: false,
+        includeNotes: true,
+        includeMedicines: true,
+        includeIntimacy: false,
+      },
+    });
+    expect(noBodyDoc.content).not.toContain('## 8. Body and lifestyle');
+
+    const noBodyCsv = buildDayTableCsv({
+      today,
+      dayLogs,
+      bodyLogs,
+      medicines: [],
+      includeBody: false,
+    });
+    expect(noBodyCsv.content).not.toContain(',2000,');
   });
 });

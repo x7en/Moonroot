@@ -1,7 +1,7 @@
 # Moonroot Progress
 
 ## Current phase
-Release 1 (Steps 1–3) complete — Step 3 (Predictions) implemented and verified
+Release 2 started — Step 4 (Body and ovulation) implemented and verified
 
 ## What is complete
 - Added `SPEC.md` at the repository root from the final specification (8 November 2026).
@@ -19,6 +19,11 @@ Release 1 (Steps 1–3) complete — Step 3 (Predictions) implemented and verifi
   - **Simulation gate** (`scripts/sim.ts`, `npm run sim`, wired in `.github/workflows/ci.yml`): simulates `n = 450` per group (Regular, Moderately irregular, Very irregular) x `16` cycles each plus real and random lead-in runs from a fixed seed, enforcing all 6 strict acceptance criteria.
   - **Doctor file Part 6, CSV exporters & golden snapshots** (`core/report/doctorFile.ts`, `core/report/csv.ts`, `tests/core/csvAndDoctorGolden.test.ts`): populated Part 6 (lead-in pattern with counts and non-proof wording) + JSON block, implemented `buildDayTableCsv` (no intimacy fields) and `buildCycleTableCsv`, and added Vitest golden snapshots across 3 fixture patients.
   - **Cycle tab & store/UI integration** (`app/store.ts`, `locales/en.json`, `ui/screens/CycleScreen.tsx`, `ui/screens/TodayScreen.tsx`, `ui/screens/OnboardingScreen.tsx`, `ui/components/DoctorFileSheet.tsx`, `ui/App.tsx`, `tests/ui/step3App.test.tsx`): built text-first Cycle screen (Fraunces 44 confidence meter, measured count, plain-word ranges, 21-day text strip, browsable month calendar, lead-in pattern status, `"Add earlier periods"`, manual start-fresh baseline), Today one-line forecast notice, CSV downloads in Doctor file sheet, and `axe-core` UI verification across themes.
+- Completed Step 4 (Body and ovulation):
+  - **Ovulation engine & forecast integration** (`core/ovulation/ovulation.ts`, `core/predict/forecast.ts`, `tests/core/ovulation.test.ts`): parses BBT 3-over-6 thermal shifts (`>= +0.2 °C`, skipping `illness` days), positive LH strips (24–36h), and peak watery/egg-white mucus (1–2 days); confirms ovulation when >= 2 modalities fall within 5 days; learns luteal quantiles after >= 2 confirmed cycles (fallback 10–16 days); engages `basis: 'ovulation'` in `computeLivePrediction`; detects `40+` non-illness BBT logs without a thermal shift for the doctor file only; never estimates from calendar alone.
+  - **Lifestyle pattern analyzer** (`core/insights/lifestyle.ts`, `tests/core/lifestyleInsights.test.ts`): runs strictly on days where both cause day and outcome day have `flow === 'none'` (excluding `fasting` days from water/meal comparisons), checks up to 20 predefined cause->next-day-outcome pairs across sleep, water, meals, stool, stress, exercise, and caffeine vs cramps, headache, mood, and energy (`>= 14` days per group, `>= 6` events, Cohen's `d >= 0.65`, Welch `|t| >= 3.85`, same-direction split-half consistency, 60-day expiry, top 3 patterns), producing 0 false discoveries across 40 uncorrelated synthetic histories (800 hypothesis tests).
+  - **Doctor file Parts 6, 8, 9, 11 & Day CSV updates** (`core/report/doctorFile.ts`, `core/report/csv.ts`, `tests/core/doctorFile.test.ts`, `tests/core/csvAndDoctorGolden.test.ts`): added lifestyle patterns to Part 6, 30-day & 90-day body/lifestyle averages (`glasses` aware) to Part 8, conditional Part 9 (omitted when unlogged; includes 40+ BBT no-shift doctor note), `STD-01` + acne/hair Part 11 question, `includeBody` toggle on doctor file + Day CSV, and `lifestylePatterns`/`ovulationSummary` in the machine-readable JSON block.
+  - **Body tab, Today ovulation signals, Cycle ovulation card, Settings units & store wiring** (`app/store.ts`, `ui/screens/BodyScreen.tsx`, `ui/screens/TodayScreen.tsx`, `ui/screens/CycleScreen.tsx`, `ui/screens/SettingsScreen.tsx`, `ui/components/DoctorFileSheet.tsx`, `ui/App.tsx`, `locales/en.json`, `tests/ui/step4App.test.tsx`): added 5-entry bottom nav (`Today`, `Cycle`, `Log`, `Record`, `Body`), plain-number Body cards (Sleep, Water `ml`/`glasses`, Meals + neutral `"Fasting today"`, Bristol 1–7 Digestion, synced `1–5` Stress, Exercise, `1–5` Energy, Skin/Hair, unlocked lifestyle patterns), optional `Ovulation signals` on Today (`°C`/`°F` conversion, LH, mucus), Cycle `Ovulation` card with `"This app is not a contraception method."` banner and `"Ways to find out"` modal, Water unit selector in Settings, serialized draft queues on `BodyScreen`/`TodayScreen`/`SettingsScreen`, and `axe-core` Step 4 UI verification.
 
 ## Approved design-freeze additions and medical interpretations (unreviewed)
 1. **Data model additions** (`core/model/types.ts`): `'shoulder-tip'` `PainSite`, `pregnancyChance`, `stoolBlood`, `'unsure'` `reliefHelped`, `weightChange`, and `dangerAnswered?: boolean`.
@@ -27,23 +32,23 @@ Release 1 (Steps 1–3) complete — Step 3 (Predictions) implemented and verifi
    - **`YEL-02` & `ORG-14` Law 1 coverage fix (`changed`, `unreviewed`, `Std`)**: Extended `YEL-02` and `ORG-14` to `pain >= 4` (`Std` unreviewed safety-preserving fix) pending clinical sign-off on pain of 8+ with no pain medicine tried.
 
 ## Deviations from SPEC.md and why
-- **Git branch name**: Working on session branch `arena/14847b8b-moonroot` rather than feature branches because this Arena session is locked to `arena/14847b8b-moonroot`.
+- **Git branch name**: Working on session branch `arena/1829d724-moonroot` (and previously `arena/14847b8b-moonroot`) rather than feature branches because Arena sessions are locked to their assigned branch.
 - **GitHub Pages**: Automatic Pages deployment is deferred while repository `x7en/Moonroot` is private; `.github/workflows/ci.yml` already builds with `VITE_BASE: /Moonroot/` and uploads the `dist/` artifact.
 - **Playwright in local sandbox**: Local sandbox outbound allowlist permits `registry.npmjs.org` and `github.com` but not Playwright browser CDN downloads; Playwright + axe browser verification runs in GitHub Actions CI, while Vitest + jsdom + `fake-indexeddb` + `axe-core` ran locally.
 - **`YEL-02` & `ORG-14` pain upper cap removed (`4+` instead of `4–7`)**: Required to satisfy exhaustive `Law 1` for `pain >= 8` with `reliefHelped = 'none-taken'`, marked `(changed)` / `unreviewed` / `Std` pending clinical sign-off.
+- **Caffeine intake field mapping**: `BodyScreen` captures caffeine via the Meals `"Caffeine"` tag (`meals.tags`) using `BodyLog` without modifying frozen `core/model/types.ts`.
 
-## Release 1 Gate Verification (Steps 1–3)
+## Step 4 Gate Verification
 - **Simulation Gate**: `npm run sim` — all 6 acceptance criteria passed across 3 x 450 synthetic people x 16 cycles + real/random lead-in simulations.
 - **Rules & Case Cards Export**: `npm run rules:export` — `docs/clinical-review.md` and `docs/case-cards.md` up to date.
 - **Typecheck**: `tsc -p tsconfig.core.json --noEmit && tsc -p tsconfig.json --noEmit` — passed (0 errors).
-- **Lint & Guardrails**: `eslint .`, `depcruise`, `lint:copy` — passed (0 violations).
-- **Tests & Coverage**: `vitest run --coverage` — 100% Lines and 100% Functions across `core/triage/**`, `core/cycles/**`, and `core/predict/**`; golden snapshots + Step 1–3 `axe-core` UI tests passed.
-- **Build**: `npm run build` — passed.
+- **Lint & Guardrails**: `eslint .`, `depcruise` (86 modules, 310 deps), `lint:copy` — passed (0 violations).
+- **Tests & Coverage**: `vitest run --coverage` — **20/20 test files, 226/226 tests passed** (`100%` Functions and `100%` Lines across `core/cycles/**`, `core/ovulation/**`, `core/predict/**`, and `core/triage/**`; `100%` Functions and `95.56%` Lines across `core/insights/**`; golden snapshots + Step 1–4 `axe-core` UI tests passed).
+- **Build**: `npm run build` — passed (`dist/` PWA with 14 precached entries).
 
-## What is left (Release 2 — Steps 4 to 7)
-- Step 4: Body tab, lifestyle pattern tests, and ovulation tracking (`core/ovulation`, `core/body`).
+## What is left (Release 2 — Steps 5 to 7)
 - Step 5: Companion sprout SVG (`ui/companion/Sprout.tsx`), rings, badges, and theme unlocks.
 - Step 6: Graphs screen, Ask your record (`core/ask`), Urdu RTL (`ur.json`), and Android Capacitor shell.
 - Step 7: Final clinical review completion, Playwright real-browser E2E + screenshots, and release signing.
 
-NEXT ACTION: Release 1 complete. Awaiting real-world usage data before starting Step 4.
+NEXT ACTION: Step 4 is complete and verified; ready to begin Step 5 (Companion) when requested.

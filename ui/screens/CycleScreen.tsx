@@ -98,6 +98,7 @@ export function CycleScreen({
   const [backfillNote, setBackfillNote] = useState('');
 
   const [baselineInput, setBaselineInput] = useState<DateKey>(today);
+  const [waysOpen, setWaysOpen] = useState(false);
 
   const step3 = computeStep3Snapshot(
     {
@@ -125,7 +126,7 @@ export function CycleScreen({
   );
 
   const { prediction, cycles } = step3;
-  const { confidence, leadIn } = prediction;
+  const { confidence, leadIn, ovulation } = prediction;
 
   const logByDate = new Map(dayLogs.map((l) => [l.date, l]));
   const browsedLog = logByDate.get(browsedDate) ?? null;
@@ -352,6 +353,98 @@ export function CycleScreen({
           </p>
         )}
       </section>
+
+      <section class="card" aria-label="Ovulation estimate">
+        <h2 class="card-title">Ovulation</h2>
+        <p class="notice-banner" style={{ marginTop: 0 }}>
+          This app is not a contraception method.
+        </p>
+
+        {ovulation.current.status === 'none' ? (
+          <div>
+            <p style={{ margin: '0 0 6px 0', fontWeight: 700 }}>{ovulation.current.message}</p>
+            <p class="muted" style={{ margin: 0 }}>
+              {profile.selfRegularity === 'irregular' || confidence.highVariabilityNote
+                ? 'With very irregular cycles it often stays at not enough signals yet, and a doctor has better ways to check.'
+                : 'Log morning temperature, LH strips, or cervical mucus on Today. The app never guesses ovulation from calendar dates alone.'}
+            </p>
+          </div>
+        ) : (
+          <div>
+            <p style={{ margin: '0 0 6px 0', fontWeight: 700 }}>
+              {ovulation.current.status === 'confirmed' ? 'Confirmed' : 'Probable'} ovulation
+              estimate around{' '}
+              {ovulation.current.ovulationDate
+                ? formatShortDate(ovulation.current.ovulationDate)
+                : ''}
+            </p>
+            <p class="muted" style={{ margin: '0 0 6px 0' }}>
+              {ovulation.current.message}
+            </p>
+            {prediction.basis === 'ovulation' && (
+              <p class="muted" style={{ margin: '0 0 6px 0' }}>
+                Next-period window above uses this confirmed ovulation estimate.
+              </p>
+            )}
+          </div>
+        )}
+
+        {ovulation.lutealSummary !== null && (
+          <p class="tabular muted" style={{ margin: '6px 0 0 0' }}>
+            Learned luteal length ({ovulation.lutealSummary.count} confirmed cycles): typical{' '}
+            {ovulation.lutealSummary.q50} days (10th to 90th percentile{' '}
+            {ovulation.lutealSummary.q10} to {ovulation.lutealSummary.q90} days).
+          </p>
+        )}
+
+        <div class="btn-row" style={{ marginTop: '12px' }}>
+          <button type="button" class="btn btn-small" onClick={() => onEditDay(today)}>
+            Log ovulation signals
+          </button>
+          <button type="button" class="btn btn-small" onClick={() => setWaysOpen(true)}>
+            Ways to find out
+          </button>
+        </div>
+      </section>
+
+      {waysOpen && (
+        <div
+          class="sheet-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ways-sheet-title"
+        >
+          <div class="sheet">
+            <div class="sheet-handle" />
+            <div class="sheet-header">
+              <h2 id="ways-sheet-title" class="card-title" style={{ margin: 0 }}>
+                Ways to find out
+              </h2>
+              <button type="button" class="btn btn-small" onClick={() => setWaysOpen(false)}>
+                Close
+              </button>
+            </div>
+            <p class="notice-banner">This app is not a contraception method.</p>
+            <p style={{ margin: '0 0 10px 0' }}>
+              <strong>Cervical mucus (free):</strong> look for clear, slippery, watery or
+              egg-white mucus. Ovulation is likely within 1 to 2 days after the last peak day.
+            </p>
+            <p style={{ margin: '0 0 10px 0' }}>
+              <strong>Morning temperature (thermometer):</strong> take your temperature before
+              getting out of bed after steady sleep. A small sustained shift shows ovulation after it
+              happens. Days when you have an illness or fever are skipped.
+            </p>
+            <p style={{ margin: '0 0 10px 0' }}>
+              <strong>LH urine strips (costs money):</strong> a positive strip shows a hormone
+              surge, meaning ovulation is likely within 24 to 36 hours.
+            </p>
+            <p class="muted" style={{ margin: 0 }}>
+              With very irregular cycles it often says not enough signals yet, and a doctor has
+              better ways to check.
+            </p>
+          </div>
+        </div>
+      )}
 
       <section class="card" aria-label="Month calendar">
         <div class="btn-row" style={{ justifyContent: 'space-between', marginBottom: '12px' }}>

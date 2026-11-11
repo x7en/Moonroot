@@ -136,7 +136,9 @@ describe('Step 1 UI and gate verification', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     // Edit logged day by tapping its row in Record timeline
-    const timelineRow = await screen.findByRole('button', { name: /^2026-11-08/i });
+    const timelineRow = await screen.findByRole('button', {
+      name: new RegExp(`^${getLocalDateKey()}`, 'i'),
+    });
     fireEvent.click(timelineRow);
     const dangerCheckBtn = await screen.findByRole('button', { name: 'Any of these right now?' });
     fireEvent.click(dangerCheckBtn);

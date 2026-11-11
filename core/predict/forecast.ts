@@ -8,6 +8,7 @@ import {
   type Forecast,
   type Profile,
 } from '../model/types';
+import { analyzeOvulation, type OvulationAnalysisResult } from '../ovulation/ovulation';
 import { computeConfidence, RECENCY_DECAY, type ConfidenceResult } from './confidence';
 import { analyzeLeadInPattern, type LeadInAnalysis } from './leadIn';
 import { weightedQuantiles, type WeightedValue } from './quantiles';
@@ -21,7 +22,7 @@ export const FALLBACK_EXTENSION_DAYS = 14;
 
 export interface CycleWindowResult {
   anchor: DateKey | null;
-  basis: 'cycle-lengths' | 'lead-in-pattern';
+  basis: 'cycle-lengths' | 'ovulation' | 'lead-in-pattern';
   daysSinceStart: number | null;
   longestGapDays: number | null;
   priorUsed: 'FIGO' | 'ACOG' | 'none';
@@ -34,6 +35,7 @@ export interface CycleWindowResult {
   droppedLikelyWindow: boolean;
   confidence: ConfidenceResult;
   leadIn: LeadInAnalysis;
+  ovulation: OvulationAnalysisResult;
   forecast: Forecast | null;
 }
 
@@ -359,6 +361,12 @@ export function computeLivePrediction(input: LivePredictionInput): CycleWindowRe
     resolvedForecasts: existingForecasts,
   });
 
+  const ovulation = analyzeOvulation({
+    today,
+    dayLogs,
+    cycles,
+  });
+
   const priorValues =
     priorBand === 'ACOG' ? ADOLESCENT_PRIOR_LENGTHS : ADULT_PRIOR_LENGTHS;
   const priorQs = weightedQuantiles(
@@ -399,18 +407,29 @@ export function computeLivePrediction(input: LivePredictionInput): CycleWindowRe
       droppedLikelyWindow: false,
       confidence,
       leadIn,
+      ovulation,
       forecast: null,
     };
   }
 
-  // Lead-in override when learned and a recent signal is active on the open cycle
-  if (
+  const ovDate =
+    ovulation.current.status === 'confirmed' ? ovulation.current.ovulationDate : null;
+  const leadActive =
     leadIn.status === 'learned' &&
-    leadIn.activeSignalDate &&
+    leadIn.activeSignalDate !== null &&
     leadIn.activeSignalDate >= openAnchor &&
+    leadIn.likely !== null &&
+    leadIn.possible !== null &&
+    leadIn.peak !== null;
+
+  // Lead-in override when learned and active (and either no confirmed ovulation or lead-in came after ovulation)
+  if (
+    leadActive &&
+    leadIn.activeSignalDate &&
     leadIn.likely &&
     leadIn.possible &&
-    leadIn.peak
+    leadIn.peak &&
+    (ovDate === null || leadIn.activeSignalDate > ovDate)
   ) {
     const forecast: Forecast = {
       id: `live:lead-in:${openAnchor}`,
@@ -439,8 +458,62 @@ export function computeLivePrediction(input: LivePredictionInput): CycleWindowRe
       droppedLikelyWindow: false,
       confidence,
       leadIn,
+      ovulation,
       forecast,
     };
+  }
+
+  // Ovulation-based forecast when current cycle has confirmed ovulation within luteal window
+  if (ovDate !== null) {
+    const luteal = ovulation.lutealSummary ?? {
+      count: 0,
+      q10: 10,
+      q25: 12,
+      q50: 13,
+      q75: 14,
+      q90: 16,
+    };
+    const possible: [DateKey, DateKey] = [
+      addDays(ovDate, luteal.q10),
+      addDays(ovDate, luteal.q90),
+    ];
+    if (possible[1] >= today) {
+      const likely: [DateKey, DateKey] = [
+        addDays(ovDate, luteal.q25),
+        addDays(ovDate, luteal.q75),
+      ];
+      const peak = addDays(ovDate, luteal.q50);
+      const forecast: Forecast = {
+        id: `live:ovulation:${openAnchor}`,
+        anchor: openAnchor,
+        madeOn: ovDate,
+        basis: 'ovulation',
+        cyclesUsed: luteal.count,
+        confidence: confidence.score,
+        likely,
+        possible,
+        peak,
+        rulesetVersion: RULESET_VERSION,
+      };
+      return {
+        anchor: openAnchor,
+        basis: 'ovulation',
+        daysSinceStart,
+        longestGapDays,
+        priorUsed: 'none',
+        priorLengthRange,
+        likely,
+        possible,
+        peak,
+        likelyWidthDays: diffDays(likely[0], likely[1]),
+        possibleWidthDays: diffDays(possible[0], possible[1]),
+        droppedLikelyWindow: false,
+        confidence,
+        leadIn,
+        ovulation,
+        forecast,
+      };
+    }
   }
 
   const priorUsed: 'FIGO' | 'ACOG' | 'none' =
@@ -474,6 +547,7 @@ export function computeLivePrediction(input: LivePredictionInput): CycleWindowRe
       droppedLikelyWindow: true,
       confidence,
       leadIn,
+      ovulation,
       forecast: null,
     };
   }
@@ -522,6 +596,7 @@ export function computeLivePrediction(input: LivePredictionInput): CycleWindowRe
     droppedLikelyWindow: false,
     confidence,
     leadIn,
+    ovulation,
     forecast,
   };
 }

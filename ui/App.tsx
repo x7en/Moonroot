@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   getRegionEmergencyInfo,
   makeDefaultProfile,
+  makeEmptyDayLog,
   MoonrootStore,
 } from '../app/store';
 import { isUnder18 } from '../core/model/dates';
 import type {
+  BodyLog,
   DateKey,
   DayLog,
   Decision,
@@ -17,6 +19,7 @@ import type {
 import { getLocalDateKey, getLocalStamp } from '../platform/web';
 import { DoctorFileSheet } from './components/DoctorFileSheet';
 import { GetHelpSheet } from './components/GetHelpSheet';
+import { BodyScreen } from './screens/BodyScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { PinLockScreen } from './screens/PinLockScreen';
 import { CycleScreen } from './screens/CycleScreen';
@@ -24,7 +27,7 @@ import { RecordScreen } from './screens/RecordScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { TodayScreen } from './screens/TodayScreen';
 
-type Tab = 'today' | 'cycle' | 'record' | 'settings';
+type Tab = 'today' | 'cycle' | 'record' | 'body' | 'settings';
 
 interface UndoState {
   date: DateKey;
@@ -149,6 +152,31 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
     refresh();
   }
 
+  async function handleSaveBodyLog(log: BodyLog): Promise<void> {
+    await store.saveBodyLog(log);
+    refresh();
+  }
+
+  async function handleSaveStress(
+    date: DateKey,
+    stress: 1 | 2 | 3 | 4 | 5 | undefined,
+  ): Promise<void> {
+    const existing = store.getDayLog(date) ?? makeEmptyDayLog(date, nowIso);
+    const nextContext = { ...existing.context };
+    if (stress === undefined) {
+      delete nextContext.stress;
+    } else {
+      nextContext.stress = stress;
+    }
+    const nextLog: DayLog = {
+      ...existing,
+      context: Object.keys(nextContext).length > 0 ? nextContext : undefined,
+      updatedAt: nowIso,
+    };
+    await store.saveDayLog(nextLog);
+    refresh();
+  }
+
   return (
     <div class="app-shell" data-tick={tick}>
       <header class="top-bar">
@@ -156,6 +184,14 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         <div class="top-actions">
           <button type="button" class="btn btn-help" onClick={() => setGetHelpOpen(true)}>
             Get help
+          </button>
+          <button
+            type="button"
+            class="btn btn-small"
+            aria-current={tab === 'settings' ? 'page' : undefined}
+            onClick={() => setTab('settings')}
+          >
+            Settings
           </button>
           {profile.lock.type === 'pin' && (
             <button
@@ -299,6 +335,20 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           />
         )}
 
+        {tab === 'body' && (
+          <BodyScreen
+            today={today}
+            selectedDate={selectedDate}
+            nowIso={nowIso}
+            profile={profile}
+            dayLogs={store.snapshot.dayLogs}
+            bodyLogs={store.snapshot.bodyLogs}
+            onChangeDate={(date) => setSelectedDate(date)}
+            onSaveBodyLog={handleSaveBodyLog}
+            onSaveStress={handleSaveStress}
+          />
+        )}
+
         {tab === 'settings' && (
           <SettingsScreen
             today={today}
@@ -376,10 +426,10 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'settings' ? 'page' : undefined}
-            onClick={() => setTab('settings')}
+            aria-current={tab === 'body' ? 'page' : undefined}
+            onClick={() => setTab('body')}
           >
-            Settings
+            Body
           </button>
         </div>
       </nav>
@@ -397,6 +447,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         under18={under18}
         profile={profile ?? makeDefaultProfile(nowIso)}
         dayLogs={store.snapshot.dayLogs}
+        bodyLogs={store.snapshot.bodyLogs}
         medicines={store.snapshot.medicines}
         visits={store.snapshot.visits}
         decisions={store.snapshot.decisions}

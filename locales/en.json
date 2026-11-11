@@ -144,5 +144,15 @@
     "leadInRetired": "This pattern is not holding.",
     "noCyclesYet": "Log your first period to start.",
     "emptyHint": "Your ranges, confidence meter, and patterns unlock as you log periods."
+  },
+  "ovulation": {
+    "notContraceptionBanner": "This app is not a contraception method.",
+    "noSignals": "Not enough signals to estimate ovulation",
+    "waysToFindOut": "Ways to find out"
+  },
+  "body": {
+    "fastingToday": "Fasting today",
+    "fastingNote": "Fasting days stay out of water and meal patterns.",
+    "notProof": "This is a pattern, not proof of cause."
   }
 }

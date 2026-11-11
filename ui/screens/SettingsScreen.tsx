@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { APP_VERSION, getRegionOptions, type BackupPreview } from '../../app/store';
 import { isUnder18 } from '../../core/model/dates';
 import { RULESET_VERSION, type DateKey, type Profile } from '../../core/model/types';
@@ -49,14 +49,45 @@ export function SettingsScreen({
   const [deleteStep, setDeleteStep] = useState<0 | 1>(0);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
+  const draftRef = useRef<Profile | null>(null);
+  const pendingWritesRef = useRef(0);
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    if (pendingWritesRef.current === 0) {
+      draftRef.current = null;
+    }
+  }, [profile]);
+
+  function patchProfile(
+    updater: Partial<Profile> | ((prev: Profile) => Partial<Profile>),
+  ): Promise<void> {
+    const base = draftRef.current ?? profile;
+    const patch = typeof updater === 'function' ? updater(base) : updater;
+    const next: Profile = { ...base, ...patch };
+    draftRef.current = next;
+    pendingWritesRef.current += 1;
+    const run = saveChainRef.current.then(async () => {
+      try {
+        await onSaveProfile(next);
+      } finally {
+        pendingWritesRef.current -= 1;
+        if (pendingWritesRef.current === 0 && draftRef.current === next) {
+          draftRef.current = null;
+        }
+      }
+    });
+    saveChainRef.current = run;
+    return run;
+  }
+
   const regions = getRegionOptions();
   const under18 = isUnder18(profile, today);
 
   function saveTextProfileChanges(): void {
     const parsedYear =
       birthYear.trim() !== '' && Number.isFinite(Number(birthYear)) ? Number(birthYear) : null;
-    void onSaveProfile({
-      ...profile,
+    void patchProfile((prev) => ({
       birthYear: parsedYear,
       conditionsNote: conditionsNote.trim(),
       medicationsNote: medicationsNote.trim(),
@@ -64,8 +95,8 @@ export function SettingsScreen({
       intimacy:
         parsedYear === null || Number(today.slice(0, 4)) - parsedYear < 18
           ? 'prefer-not-to-say'
-          : profile.intimacy,
-    });
+          : prev.intimacy,
+    }));
   }
 
   async function handleSavePin(): Promise<void> {
@@ -156,7 +187,7 @@ export function SettingsScreen({
                 type="button"
                 class="chip"
                 aria-pressed={profile.theme === opt.value}
-                onClick={() => void onSaveProfile({ ...profile, theme: opt.value })}
+                onClick={() => void patchProfile({ theme: opt.value })}
               >
                 {opt.label}
               </button>
@@ -174,13 +205,38 @@ export function SettingsScreen({
                 class="chip"
                 aria-pressed={profile.units.temperature === unit}
                 onClick={() =>
-                  void onSaveProfile({
-                    ...profile,
-                    units: { ...profile.units, temperature: unit },
-                  })
+                  void patchProfile((prev) => ({
+                    units: { ...prev.units, temperature: unit },
+                  }))
                 }
               >
                 °{unit}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Water unit</span>
+          <div class="chip-group">
+            {(
+              [
+                { value: 'ml', label: 'ml' },
+                { value: 'glasses', label: 'glasses (250 ml)' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                class="chip"
+                aria-pressed={profile.units.water === opt.value}
+                onClick={() =>
+                  void patchProfile((prev) => ({
+                    units: { ...prev.units, water: opt.value },
+                  }))
+                }
+              >
+                {opt.label}
               </button>
             ))}
           </div>
@@ -193,7 +249,7 @@ export function SettingsScreen({
             class="select"
             value={profile.region}
             onChange={(e) =>
-              void onSaveProfile({ ...profile, region: (e.target as HTMLSelectElement).value })
+              void patchProfile({ region: (e.target as HTMLSelectElement).value })
             }
           >
             {regions.map((r) => (
@@ -234,7 +290,7 @@ export function SettingsScreen({
                 type="button"
                 class="chip"
                 aria-pressed={profile.onHormones === opt.value}
-                onClick={() => void onSaveProfile({ ...profile, onHormones: opt.value })}
+                onClick={() => void patchProfile({ onHormones: opt.value })}
               >
                 {opt.label}
               </button>
@@ -252,7 +308,7 @@ export function SettingsScreen({
                   class="chip"
                   aria-pressed={profile.sexualHealthQuestions === opt}
                   onClick={() =>
-                    void onSaveProfile({ ...profile, sexualHealthQuestions: opt })
+                    void patchProfile({ sexualHealthQuestions: opt })
                   }
                 >
                   {opt === 'when-relevant' ? 'When relevant' : 'Off'}

@@ -1,11 +1,13 @@
 import { deriveCycles } from '../core/cycles/cycles';
 import { classifyEpisodes } from '../core/cycles/episodes';
+import { analyzeLifestylePatterns, type LifestyleAnalysisResult } from '../core/insights/lifestyle';
 import { addDays, diffDays } from '../core/model/dates';
 import {
   RULESET_VERSION,
   SCHEMA_VERSION,
   type AppSnapshotData,
   type BackupMeta,
+  type BodyLog,
   type DateKey,
   type DayLog,
   type Decision,
@@ -16,6 +18,7 @@ import {
   type StandingFlagId,
   type Verdict,
 } from '../core/model/types';
+import { type OvulationAnalysisResult } from '../core/ovulation/ovulation';
 import {
   computeLivePrediction,
   reconcileForecasts,
@@ -212,6 +215,28 @@ export function computeStep3Snapshot(
   };
 }
 
+export function computeStep4Snapshot(
+  snapshot: AppSnapshotData,
+  selectedDate: DateKey,
+  today: DateKey,
+  nowIso: Stamp,
+): ReturnType<typeof computeStep3Snapshot> & {
+  lifestyle: LifestyleAnalysisResult;
+  ovulation: OvulationAnalysisResult;
+} {
+  const step3 = computeStep3Snapshot(snapshot, selectedDate, today, nowIso);
+  const lifestyle = analyzeLifestylePatterns({
+    today,
+    dayLogs: snapshot.dayLogs,
+    bodyLogs: snapshot.bodyLogs,
+  });
+  return {
+    ...step3,
+    lifestyle,
+    ovulation: step3.prediction.ovulation,
+  };
+}
+
 export class MoonrootStore {
   readonly storage: IndexedDBStorage;
   snapshot: AppSnapshotData;
@@ -276,6 +301,21 @@ export class MoonrootStore {
 
   getDayLog(date: DateKey): DayLog | null {
     return this.snapshot.dayLogs.find((d) => d.date === date) ?? null;
+  }
+
+  getBodyLog(date: DateKey): BodyLog | null {
+    return this.snapshot.bodyLogs.find((b) => b.date === date) ?? null;
+  }
+
+  async saveBodyLog(log: BodyLog): Promise<BodyLog | null> {
+    const previous = this.getBodyLog(log.date);
+    await this.storage.saveBodyLog(log);
+    const others = this.snapshot.bodyLogs.filter((b) => b.date !== log.date);
+    this.snapshot = {
+      ...this.snapshot,
+      bodyLogs: [...others, log].sort((a, b) => a.date.localeCompare(b.date)),
+    };
+    return previous;
   }
 
   async syncTriageState(

@@ -75,6 +75,25 @@ const PAIN_SITES: readonly { key: PainSite; label: string }[] = [
   { key: 'other', label: 'Other' },
 ];
 
+function formatBbtDisplay(bbtC: number | undefined, unit: 'C' | 'F'): string {
+  if (bbtC === undefined) return '';
+  if (unit === 'F') {
+    return String(Number(((bbtC * 9) / 5 + 32).toFixed(1)));
+  }
+  return String(Number(bbtC.toFixed(2)));
+}
+
+function parseBbtToCelsius(raw: string, unit: 'C' | 'F'): number | null {
+  const num = Number(raw.trim());
+  if (!Number.isFinite(num)) return null;
+  if (unit === 'F') {
+    if (num < 93 || num > 108) return null;
+    return Number((((num - 32) * 5) / 9).toFixed(2));
+  }
+  if (num < 34 || num > 42) return null;
+  return Number(num.toFixed(2));
+}
+
 function verdictPresentation(level: string): {
   icon: string;
   cssClass: string;
@@ -132,6 +151,9 @@ export function TodayScreen({
 
   const current: DayLog = dayLog ?? makeEmptyDayLog(selectedDate, nowIso);
   const [noteDraft, setNoteDraft] = useState<string>(current.note);
+  const [bbtDraft, setBbtDraft] = useState<string>(() =>
+    formatBbtDisplay(current.fertility?.bbt, profile.units.temperature),
+  );
   const draftRef = useRef<DayLog | null>(null);
   const pendingWritesRef = useRef(0);
   const lastDateRef = useRef<DateKey>(selectedDate);
@@ -144,7 +166,8 @@ export function TodayScreen({
 
   useEffect(() => {
     setNoteDraft(dayLog?.note ?? '');
-  }, [selectedDate, dayLog?.note]);
+    setBbtDraft(formatBbtDisplay(dayLog?.fertility?.bbt, profile.units.temperature));
+  }, [selectedDate, dayLog?.note, dayLog?.fertility?.bbt, profile.units.temperature]);
 
   const step2 = computeStep3Snapshot(
     {
@@ -220,11 +243,14 @@ export function TodayScreen({
     current.discharge === 'odour' ||
     current.discharge === 'yellow-green';
 
-  function patchLog(patch: Partial<DayLog>): Promise<void> {
+  function patchLog(
+    updater: Partial<DayLog> | ((prev: DayLog) => Partial<DayLog>),
+  ): Promise<void> {
     const base =
       draftRef.current && draftRef.current.date === selectedDate
         ? draftRef.current
         : (dayLog ?? makeEmptyDayLog(selectedDate, nowIso));
+    const patch = typeof updater === 'function' ? updater(base) : updater;
     const next: DayLog = {
       ...base,
       ...patch,
@@ -1153,6 +1179,133 @@ export function TodayScreen({
             ))}
           </div>
         )}
+      </section>
+
+      <section class="card" aria-label="Ovulation signals">
+        <h2 class="card-title">Ovulation signals (optional)</h2>
+        <div class="field">
+          <label htmlFor="bbt-temp-input">
+            Morning temperature (°{profile.units.temperature})
+          </label>
+          <div class="btn-row">
+            <input
+              id="bbt-temp-input"
+              class="input tabular"
+              type="number"
+              step="0.1"
+              inputMode="decimal"
+              style={{ flex: '1 1 130px' }}
+              value={bbtDraft}
+              placeholder={profile.units.temperature === 'F' ? 'e.g. 97.6' : 'e.g. 36.45'}
+              onInput={(e) => {
+                const raw = (e.target as HTMLInputElement).value;
+                setBbtDraft(raw);
+                if (!raw.trim()) {
+                  void patchLog((prev) => {
+                    const rest = { ...prev.fertility };
+                    delete rest.bbt;
+                    return { fertility: Object.keys(rest).length > 0 ? rest : undefined };
+                  });
+                  return;
+                }
+                const cVal = parseBbtToCelsius(raw, profile.units.temperature);
+                if (cVal !== null) {
+                  void patchLog((prev) => ({
+                    fertility: { ...prev.fertility, bbt: cVal },
+                  }));
+                }
+              }}
+            />
+            <label htmlFor="bbt-time-input" class="sr-only">
+              Temperature time
+            </label>
+            <input
+              id="bbt-time-input"
+              class="input tabular"
+              type="time"
+              style={{ flex: '0 1 120px' }}
+              value={current.fertility?.bbtTime ?? ''}
+              onInput={(e) => {
+                const tVal = (e.target as HTMLInputElement).value;
+                void patchLog((prev) => {
+                  const nextFertility = { ...prev.fertility };
+                  if (tVal) {
+                    nextFertility.bbtTime = tVal;
+                  } else {
+                    delete nextFertility.bbtTime;
+                  }
+                  return {
+                    fertility: Object.keys(nextFertility).length > 0 ? nextFertility : undefined,
+                  };
+                });
+              }}
+            />
+          </div>
+          {profile.units.temperature === 'F' && current.fertility?.bbt !== undefined && (
+            <p class="muted tabular" style={{ margin: '4px 0 0 0' }}>
+              Stored internally as {current.fertility.bbt.toFixed(2)} °C.
+            </p>
+          )}
+        </div>
+
+        <div class="field">
+          <span class="field-label">LH strip</span>
+          <div class="chip-group">
+            {(['negative', 'faint', 'positive'] as const).map((lhVal) => (
+              <button
+                key={lhVal}
+                type="button"
+                class="chip"
+                aria-label={`LH ${lhVal}`}
+                aria-pressed={current.fertility?.lh === lhVal}
+                onClick={() => {
+                  void patchLog((prev) => {
+                    const nextFertility = { ...prev.fertility };
+                    if (nextFertility.lh === lhVal) {
+                      delete nextFertility.lh;
+                    } else {
+                      nextFertility.lh = lhVal;
+                    }
+                    return {
+                      fertility: Object.keys(nextFertility).length > 0 ? nextFertility : undefined,
+                    };
+                  });
+                }}
+              >
+                {lhVal}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div class="field" style={{ marginBottom: 0 }}>
+          <span class="field-label">Cervical mucus</span>
+          <div class="chip-group">
+            {(['dry', 'sticky', 'creamy', 'watery', 'egg-white'] as const).map((mucusVal) => (
+              <button
+                key={mucusVal}
+                type="button"
+                class="chip"
+                aria-pressed={current.fertility?.mucus === mucusVal}
+                onClick={() => {
+                  void patchLog((prev) => {
+                    const nextFertility = { ...prev.fertility };
+                    if (nextFertility.mucus === mucusVal) {
+                      delete nextFertility.mucus;
+                    } else {
+                      nextFertility.mucus = mucusVal;
+                    }
+                    return {
+                      fertility: Object.keys(nextFertility).length > 0 ? nextFertility : undefined,
+                    };
+                  });
+                }}
+              >
+                {mucusVal}
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section class="card" aria-label="Symptoms and notes">
