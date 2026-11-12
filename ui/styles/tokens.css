@@ -21,6 +21,10 @@
   --shadow: none;
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif;
+  --dur-fast: 120ms;
+  --dur-mid: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
 }
 
 [data-theme='dawn'] {

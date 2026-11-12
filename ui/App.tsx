@@ -22,13 +22,16 @@ import type {
 import {
   getLocalDateKey,
   getLocalStamp,
+  playGentleChime,
   prefersLightTheme,
   prefersReducedMotion,
   triggerHaptic,
 } from '../platform/web';
 import { DoctorFileSheet } from './components/DoctorFileSheet';
 import { GetHelpSheet } from './components/GetHelpSheet';
+import { AskScreen } from './screens/AskScreen';
 import { BodyScreen } from './screens/BodyScreen';
+import { GraphsScreen } from './screens/GraphsScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { PinLockScreen } from './screens/PinLockScreen';
 import { CycleScreen } from './screens/CycleScreen';
@@ -37,6 +40,10 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { TodayScreen } from './screens/TodayScreen';
 
 type Tab = 'today' | 'cycle' | 'record' | 'body' | 'settings';
+type SubView =
+  | { kind: 'graphs'; returnTab: 'cycle' | 'body' | 'record' }
+  | { kind: 'ask' }
+  | null;
 
 interface UndoState {
   date: DateKey;
@@ -48,6 +55,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   const [ready, setReady] = useState(false);
   const [tick, setTick] = useState(0);
   const [tab, setTab] = useState<Tab>('today');
+  const [subView, setSubView] = useState<SubView>(null);
   const [selectedDate, setSelectedDate] = useState<DateKey>(() => getLocalDateKey());
   const [getHelpOpen, setGetHelpOpen] = useState(false);
   const [doctorFileOpen, setDoctorFileOpen] = useState(false);
@@ -87,6 +95,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   const profile = store.snapshot.profile;
   const reducedMotion = Boolean(profile?.reducedMotion) || prefersReducedMotion();
   const hapticsEnabled = profile?.haptics !== false;
+  const soundEnabled = Boolean(profile?.sound);
   const rawTheme = profile?.theme ?? 'dusk';
   const resolvedTheme =
     rawTheme === 'auto'
@@ -121,6 +130,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         setActiveStageUp(false);
       }, 1200);
       triggerHaptic('medium', hapticsEnabled, reducedMotion);
+      playGentleChime('stage-up', soundEnabled);
     }
     if (outcome.newlyEarnedBadges.length > 0 && outcome.newStage >= 2) {
       setActivePetalBurst(true);
@@ -194,6 +204,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   async function handleSaveDayLog(log: DayLog): Promise<void> {
     const prev = await store.saveDayLog(log);
     triggerHaptic('light', hapticsEnabled, reducedMotion);
+    playGentleChime('checkin', soundEnabled);
     const currentStage = store.lastCompanionEvent?.newStage ?? store.snapshot.companion.stage;
     if (currentStage >= 1) {
       fireReaction('other');
@@ -271,8 +282,11 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           <button
             type="button"
             class="btn btn-small"
-            aria-current={tab === 'settings' ? 'page' : undefined}
-            onClick={() => setTab('settings')}
+            aria-current={tab === 'settings' && subView === null ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('settings');
+            }}
           >
             Settings
           </button>
@@ -281,6 +295,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               type="button"
               class="btn btn-small"
               onClick={() => {
+                setSubView(null);
                 setTab('today');
                 store.locked = true;
                 refresh();
@@ -293,7 +308,55 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
       </header>
 
       <main>
-        {tab === 'today' && (
+        {subView?.kind === 'graphs' && (
+          <GraphsScreen
+            today={today}
+            nowIso={nowIso}
+            profile={profile}
+            dayLogs={store.snapshot.dayLogs}
+            bodyLogs={store.snapshot.bodyLogs}
+            decisions={store.snapshot.decisions}
+            forecasts={store.snapshot.forecasts}
+            medicines={store.snapshot.medicines}
+            verdicts={store.snapshot.verdicts}
+            watchItems={store.snapshot.watchItems}
+            visits={store.snapshot.visits}
+            meta={store.snapshot.meta}
+            returnLabel={
+              subView.returnTab === 'cycle'
+                ? 'Cycle'
+                : subView.returnTab === 'body'
+                  ? 'Body'
+                  : 'Record'
+            }
+            onBack={() => {
+              const target = subView.returnTab;
+              setSubView(null);
+              setTab(target);
+            }}
+          />
+        )}
+
+        {subView?.kind === 'ask' && (
+          <AskScreen
+            today={today}
+            nowIso={nowIso}
+            profile={profile}
+            dayLogs={store.snapshot.dayLogs}
+            bodyLogs={store.snapshot.bodyLogs}
+            decisions={store.snapshot.decisions}
+            forecasts={store.snapshot.forecasts}
+            medicines={store.snapshot.medicines}
+            verdicts={store.snapshot.verdicts}
+            meta={store.snapshot.meta}
+            onBack={() => {
+              setSubView(null);
+              setTab('record');
+            }}
+          />
+        )}
+
+        {subView === null && tab === 'today' && (
           <TodayScreen
             today={today}
             selectedDate={selectedDate}
@@ -354,7 +417,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           />
         )}
 
-        {tab === 'cycle' && (
+        {subView === null && tab === 'cycle' && (
           <CycleScreen
             today={today}
             nowIso={nowIso}
@@ -369,6 +432,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             meta={store.snapshot.meta}
             onEditDay={(date) => {
               setSelectedDate(date);
+              setSubView(null);
               setTab('today');
             }}
             onSaveApproximatePeriod={async (startDate, durationDays) => {
@@ -383,10 +447,11 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               await store.deleteDecision(id);
               refresh();
             }}
+            onOpenGraphs={() => setSubView({ kind: 'graphs', returnTab: 'cycle' })}
           />
         )}
 
-        {tab === 'record' && (
+        {subView === null && tab === 'record' && (
           <RecordScreen
             today={today}
             nowIso={nowIso}
@@ -401,6 +466,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             companion={store.snapshot.companion}
             onEditDay={(date) => {
               setSelectedDate(date);
+              setSubView(null);
               setTab('today');
             }}
             onSaveDecision={async (dec: Decision) => {
@@ -431,15 +497,20 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               });
               setDoctorFileOpen(true);
             }}
-            onQuickExportBackup={() => setTab('settings')}
+            onQuickExportBackup={() => {
+              setSubView(null);
+              setTab('settings');
+            }}
             onSnoozeBackup={async () => {
               await store.snoozeBackupNudge();
               refresh();
             }}
+            onOpenGraphs={() => setSubView({ kind: 'graphs', returnTab: 'record' })}
+            onOpenAsk={() => setSubView({ kind: 'ask' })}
           />
         )}
 
-        {tab === 'body' && (
+        {subView === null && tab === 'body' && (
           <BodyScreen
             today={today}
             selectedDate={selectedDate}
@@ -458,10 +529,11 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             onChangeDate={(date) => setSelectedDate(date)}
             onSaveBodyLog={handleSaveBodyLog}
             onSaveStress={handleSaveStress}
+            onOpenGraphs={() => setSubView({ kind: 'graphs', returnTab: 'body' })}
           />
         )}
 
-        {tab === 'settings' && (
+        {subView === null && tab === 'settings' && (
           <SettingsScreen
             today={today}
             profile={profile}
@@ -508,16 +580,22 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'today' ? 'page' : undefined}
-            onClick={() => setTab('today')}
+            aria-current={subView === null && tab === 'today' ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('today');
+            }}
           >
             Today
           </button>
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'cycle' ? 'page' : undefined}
-            onClick={() => setTab('cycle')}
+            aria-current={subView === null && tab === 'cycle' ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('cycle');
+            }}
           >
             Cycle
           </button>
@@ -527,6 +605,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             aria-label="Log today"
             onClick={() => {
               setSelectedDate(today);
+              setSubView(null);
               setTab('today');
             }}
           >
@@ -535,16 +614,22 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'record' ? 'page' : undefined}
-            onClick={() => setTab('record')}
+            aria-current={subView === null && tab === 'record' ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('record');
+            }}
           >
             Record
           </button>
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'body' ? 'page' : undefined}
-            onClick={() => setTab('body')}
+            aria-current={subView === null && tab === 'body' ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('body');
+            }}
           >
             Body
           </button>

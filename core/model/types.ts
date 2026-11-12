@@ -147,6 +147,7 @@ export interface Profile {
   disclaimerAcceptedAt: Stamp | null;
   reducedMotion?: boolean;
   haptics?: boolean;
+  sound?: boolean;
 }
 
 export interface DayLog {

@@ -31,6 +31,7 @@ interface CycleScreenProps {
   onSaveApproximatePeriod: (startDate: DateKey, durationDays: number) => Promise<void>;
   onSaveDecision: (decision: Decision) => Promise<void>;
   onDeleteDecision: (id: string) => Promise<void>;
+  onOpenGraphs?: () => void;
 }
 
 const MONTH_NAMES = [
@@ -86,6 +87,7 @@ export function CycleScreen({
   onSaveApproximatePeriod,
   onSaveDecision,
   onDeleteDecision,
+  onOpenGraphs,
 }: CycleScreenProps) {
   const parsedToday = parseDateKey(today);
   const [viewYear, setViewYear] = useState(parsedToday.year);
@@ -195,8 +197,8 @@ export function CycleScreen({
           <div>
             <p style={{ margin: '6px 0 4px 0', fontWeight: 700 }}>Log your first period to start.</p>
             <p class="muted" style={{ margin: 0 }}>
-              Each period you log tightens your ranges. Your cycle windows, track record, and
-              patterns unlock as you log.
+              Each period you log tightens your ranges. Next-period ranges unlock after 1 period
+              start, cycle track record after 2 completed cycles, and lead-in patterns after 4 cycles.
             </p>
             <div class="btn-row" style={{ marginTop: '12px' }}>
               <button type="button" class="btn btn-primary" onClick={() => onEditDay(today)}>
@@ -243,6 +245,13 @@ export function CycleScreen({
                 from how you log.
               </p>
             )}
+          </div>
+        )}
+        {onOpenGraphs && (
+          <div class="btn-row" style={{ marginTop: '12px' }}>
+            <button type="button" class="btn" onClick={onOpenGraphs}>
+              Graphs
+            </button>
           </div>
         )}
       </section>

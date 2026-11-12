@@ -66,3 +66,35 @@ export function triggerHaptic(
     // Ignore vibration errors in locked-down webviews
   }
 }
+
+export function playGentleChime(
+  kind: 'checkin' | 'stage-up',
+  enabled: boolean,
+): void {
+  if (!enabled) return;
+  if (typeof window === 'undefined') return;
+  const AudioCtx =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return;
+  try {
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = kind === 'stage-up' ? 523.25 : 440;
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.025, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + (kind === 'stage-up' ? 0.28 : 0.14));
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.3);
+    window.setTimeout(() => {
+      void ctx.close?.();
+    }, 350);
+  } catch {
+    // Ignore audio errors in sandboxed / silent environments
+  }
+}

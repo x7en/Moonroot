@@ -395,7 +395,9 @@ export function TodayScreen({
             <span>Ready for today&apos;s check-in</span>
           </div>
           <p class="muted" style={{ marginBottom: 0 }}>
-            Tap Flow and Pain below (under 10 seconds) to see today&apos;s result.
+            {dayLogs.length === 0
+              ? 'Log your first period to start. Confidence starts at 10%.'
+              : 'Tap Flow and Pain below (under 10 seconds) to see today’s result.'}
           </p>
         </section>
       ) : (

@@ -162,5 +162,13 @@
     "moodWelcome": "Welcome back",
     "weeklyReviewTitle": "Sunday weekly review",
     "weeklyReviewOpen": "Open weekly review"
+  },
+  "ask": {
+    "title": "Ask your record",
+    "subtitle": "Tap one of the ten questions below. Every answer uses only your saved entries on this device."
+  },
+  "graphs": {
+    "title": "Graphs",
+    "buttonLabel": "Graphs"
   }
 }

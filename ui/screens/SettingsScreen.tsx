@@ -236,6 +236,16 @@ export function SettingsScreen({
               />
               <span>Light haptics</span>
             </label>
+            <label class="chip">
+              <input
+                type="checkbox"
+                checked={Boolean(profile.sound)}
+                onChange={(e) =>
+                  void patchProfile({ sound: (e.target as HTMLInputElement).checked })
+                }
+              />
+              <span>Gentle sounds</span>
+            </label>
           </div>
         </div>
 

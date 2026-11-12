@@ -121,6 +121,7 @@ export function makeDefaultProfile(nowIso: Stamp = getLocalStamp()): Profile {
     disclaimerAcceptedAt: null,
     reducedMotion: false,
     haptics: true,
+    sound: false,
   };
 }
 

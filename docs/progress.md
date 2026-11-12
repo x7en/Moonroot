@@ -1,7 +1,7 @@
 # Moonroot Progress
 
 ## Current phase
-Release 2 progressing — Step 5 (Companion) implemented and verified
+Release 2 progressing — Step 6 (Visual polish and Ask) implemented and verified
 
 ## What is complete
 - Added `SPEC.md` at the repository root from the final specification (8 November 2026).
@@ -28,6 +28,11 @@ Release 2 progressing — Step 5 (Companion) implemented and verified
   - **Pure companion engine** (`core/companion/companion.ts`, `core/model/types.ts`, `tests/core/companion.test.ts`): implemented `STAGE_DEFINITIONS` across all 7 stages (`0`, `3`, `10`, `25`, `50`, `90`, `150` rings — Seed -> Sprout -> Seedling -> Young plant -> Budding -> Blooming -> Moonflower), `THEME_CATALOGUE` (Dusk, Dawn, Match phone, and High Contrast always unlocked; Meadow at Stage 3 Young plant, Ocean at Stage 4 Budding, Rose at Stage 5 Blooming, Midnight at Stage 6 Moonflower), all 8 permanent `BADGE_DEFINITIONS` (`first-light`, `three-this-week`, `first-full-cycle`, `record-keeper`, `backed-up`, `body-scan`, `pattern-found`, `steady-roots`), hard daily 2-ring cap (`awardCompanionRing` across check-in, Body log, follow-up answer, and Sunday Weekly Review), monotonic Law-of-the-Sprout reconciliation (rings never decrease and earned badges never reset on edits, Undo, or deletions), 4-mood derivation (`bright`, `calm`, `sleepy` after >= 3 days, single-visit `welcome` unfurl on check-in after sleepy), tap messages (`pickTapMessage`), and 20-second Sunday evening `WeeklyReviewSummary` builder (`buildWeeklyReviewSummary`).
   - **WCAG AA themes, reduced motion & face-free Sprout SVG** (`ui/companion/Sprout.tsx`, `ui/styles/tokens.css`, `ui/styles/base.css`, `tests/core/themeContrast.test.ts`): built `<Sprout>` rendering all 7 botanical stages and 4 moods solely via leaf posture and gentle glow (zero face, zero wilting/brown states), transient `< 1s` reaction overlays starting strictly at Stage 1 (`Sprout`) — Stage 0 (`Seed`) renders zero raindrops/moonbeam/sunbeam/sparkle reactions — Stage 6 (`Moonflower`) unlocking the Midnight theme and soft `night-garden` backdrop (`[data-night-garden='true']`, never shown at Stages 0–5), `prefers-reduced-motion` + Settings `Reduce motion` override disabling sway/reaction animations and switching to a static glow, and WCAG-verified `meadow`, `ocean`, `rose`, and AMOLED `#000000` `midnight` palettes (`>= 6.5:1` text contrast, `>= 4.3:1` accent contrast).
   - **Store, screens & privacy PIN lock** (`platform/web.ts`, `app/store.ts`, `ui/App.tsx`, `ui/screens/TodayScreen.tsx`, `ui/screens/BodyScreen.tsx`, `ui/screens/RecordScreen.tsx`, `ui/screens/SettingsScreen.tsx`, `ui/screens/PinLockScreen.tsx`, `ui/components/DoctorFileSheet.tsx`, `locales/en.json`, `tests/ui/step5App.test.tsx`): wired monotonic ring/badge updates across live saves, backup exports, and Doctor file creation; kept normal Today check-ins to `<= 4` taps (`Flow` -> `Pain` -> `Any of these? None -> Verdict + 1 ring`); added `<Sprout>` tap card + Sunday evening Weekly Review card on Today; added `Badges` 8-tile grid on Record; added theme lock hints + `Reduce motion` / `Light haptics` toggles in Settings; replaced any text health clues on `PinLockScreen` with a calm `<Sprout>`; and verified all Step 5 UI flows + `axe-core` zero-violation checks.
+- Completed Step 6 (Visual polish and Ask):
+  - **Tokens, motion, haptics, sound defaults & empty states** (`ui/styles/tokens.css`, `ui/styles/base.css`, `platform/web.ts`, `app/store.ts`, `core/model/types.ts`, `ui/screens/{TodayScreen,CycleScreen,BodyScreen,SettingsScreen}.tsx`): added CSS timing scale tokens (`--dur-fast: 120ms`, `--dur-mid: 200ms`, `--dur-slow: 320ms`, `--ease-out`), reduced-motion static glow & `200ms` crossfade stage-up, optional `Light haptics` (10ms flow tick, 30ms stage-up), `Gentle sounds` off by default (`Profile.sound = false`, `playGentleChime` guarded Web Audio oscillator), honest Day 1 / Cycle / Body empty states without sample data (`Log your first period to start. Confidence starts at 10%.`), and `360px` / `200%` wrapping + `>= 48px` tap targets.
+  - **Graphs engine & screen** (`core/graphs/graphs.ts`, `ui/screens/GraphsScreen.tsx`, `tests/core/graphs.test.ts`): hand-drawn token SVG charts only shown when `Graphs` is tapped on Cycle, Body, or Record (`240°` confidence arc `10..95`, 30-day forecast ribbon, cycle length bars with typical range & median line, 14-day flow/pain timeline, weekly medicine bars by generic name with zero safety/limit commentary, and unlocked lifestyle pattern bars); zero chart SVGs render on Today, Cycle, Body, or Record until requested.
+  - **Ask your record engine & screen** (`core/ask/ask.ts`, `ui/screens/AskScreen.tsx`, `scripts/lint-copy.ts`, `tests/core/ask.test.ts`): implemented exact 10 fixed tappable questions powered purely by local data with explicit date ranges, missing-data explanations, medicine sums only (`Check the pack for the daily limit`), zero text inputs, zero AI/chat, and full copy-lint coverage of `core/ask/`.
+  - **Step 6 UI & accessibility verification** (`tests/ui/step6App.test.tsx`): verified Day 1 empty states, chart-gating across all tabs + unlocked lifestyle pattern visual toggle, all 10 `Ask` answers against fixtures with zero `<input>`/`<textarea>`, `axe-core` across Dusk, Dawn, and High contrast, `200%` text scaling rules, sound default-off & toggle, haptics, and reduced-motion stage-up rules.
 
 ## Approved design-freeze additions and medical interpretations (unreviewed)
 1. **Data model additions** (`core/model/types.ts`): `'shoulder-tip'` `PainSite`, `pregnancyChance`, `stoolBlood`, `'unsure'` `reliefHelped`, `weightChange`, and `dangerAnswered?: boolean`.
@@ -50,8 +55,15 @@ Release 2 progressing — Step 5 (Companion) implemented and verified
 - **Tests & Coverage**: `vitest run --coverage` — **23/23 test files, 239/239 tests passed** (`100%` Functions and `100%` Lines across `core/companion/**`, `core/cycles/**`, `core/ovulation/**`, `core/predict/**`, and `core/triage/**`; `100%` Functions and `95.56%` Lines across `core/insights/**`; WCAG AA theme contrast test across all 7 themes + Step 1–5 `axe-core` UI tests passed).
 - **Build**: `npm run build` — passed (`dist/` PWA with 14 precached entries, `83.21 kB` gzipped JS).
 
-## What is left (Release 2 — Steps 6 to 7)
-- Step 6: Graphs screen, Ask your record (`core/ask`), Urdu RTL (`ur.json`), and Android Capacitor shell.
-- Step 7: Final clinical review completion, Playwright real-browser E2E + screenshots, and release signing.
+## Step 6 Gate Verification
+- **Simulation Gate**: `npm run sim` — all 6 acceptance criteria passed.
+- **Rules & Case Cards Export**: `npm run rules:export` — `docs/clinical-review.md` and `docs/case-cards.md` up to date.
+- **Typecheck**: `tsc -p tsconfig.core.json --noEmit && tsc -p tsconfig.json --noEmit` — passed (0 errors).
+- **Lint & Guardrails**: `eslint .`, `depcruise` (98 modules, 385 deps), `lint:copy` (including `core/ask/`) — passed (0 violations).
+- **Tests & Coverage**: `vitest run --coverage` — **26/26 test files, 250/250 tests passed** (`99.05%` lines / `99.67%` funcs across `core/`, including `100%` lines/funcs on `core/graphs`, `94.88%` lines on `core/ask`, plus `axe-core` across Dusk, Dawn, and High contrast in `tests/ui/step6App.test.tsx`).
+- **Build**: `npm run build` — passed (`npm run build:core && vite build`, `dist/` PWA with 14 precached entries, `91.71 kB` gzipped JS).
 
-NEXT ACTION: Step 5 is complete and verified; ready to begin Step 6 (Graphs, Ask your record, Urdu RTL, Android wrapper) when requested.
+## What is left (Release 2 — Step 7)
+- Step 7 (Android): Capacitor shell, reminders, home widget and `WidgetBridge`, hidden app preview, automatic cloud backup switched off with CI manifest check, keystore signing, `.github/workflows/android.yml` APK pipeline, Playwright real-browser E2E + screenshots in CI, Urdu RTL (`ur.json`) when requested, and clinical review completion.
+
+NEXT ACTION: Step 7 Android

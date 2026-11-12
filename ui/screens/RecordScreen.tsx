@@ -36,6 +36,8 @@ interface RecordScreenProps {
   onOpenDoctorFile: () => void;
   onQuickExportBackup: () => void;
   onSnoozeBackup: () => Promise<void>;
+  onOpenGraphs?: () => void;
+  onOpenAsk?: () => void;
 }
 
 export function RecordScreen({
@@ -59,6 +61,8 @@ export function RecordScreen({
   onOpenDoctorFile,
   onQuickExportBackup,
   onSnoozeBackup,
+  onOpenGraphs,
+  onOpenAsk,
 }: RecordScreenProps) {
   const [pastDate, setPastDate] = useState<string>(today);
   const [visitDate, setVisitDate] = useState<string>(today);
@@ -159,6 +163,20 @@ export function RecordScreen({
             Create doctor file
           </button>
         </div>
+        {(onOpenAsk || onOpenGraphs) && (
+          <div class="btn-row" style={{ marginTop: '12px' }}>
+            {onOpenAsk && (
+              <button type="button" class="btn" onClick={onOpenAsk}>
+                Ask your record
+              </button>
+            )}
+            {onOpenGraphs && (
+              <button type="button" class="btn" onClick={onOpenGraphs}>
+                Graphs
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       <section class="card" aria-label="Derived cycles">

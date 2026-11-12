@@ -179,6 +179,7 @@ function walkUiFiles(dir: string): void {
   }
 }
 walkUiFiles(resolve(root, 'ui'));
+walkUiFiles(resolve(root, 'core/ask'));
 
 if (violations.length > 0) {
   console.error('Copy lint failed:');

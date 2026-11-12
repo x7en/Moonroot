@@ -27,6 +27,7 @@ interface BodyScreenProps {
   onChangeDate: (date: DateKey) => void;
   onSaveBodyLog: (log: BodyLog) => Promise<void>;
   onSaveStress: (date: DateKey, stress: 1 | 2 | 3 | 4 | 5 | undefined) => Promise<void>;
+  onOpenGraphs?: () => void;
 }
 
 const ML_PER_GLASS = 250;
@@ -77,6 +78,7 @@ export function BodyScreen({
   onChangeDate,
   onSaveBodyLog,
   onSaveStress,
+  onOpenGraphs,
 }: BodyScreenProps) {
   const existingBody = bodyLogs.find((b) => b.date === selectedDate) ?? null;
   const existingDay = dayLogs.find((d) => d.date === selectedDate) ?? null;
@@ -739,6 +741,13 @@ export function BodyScreen({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+        {onOpenGraphs && (
+          <div class="btn-row" style={{ marginTop: '12px' }}>
+            <button type="button" class="btn" onClick={onOpenGraphs}>
+              Graphs
+            </button>
           </div>
         )}
       </section>
