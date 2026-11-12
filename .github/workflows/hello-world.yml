@@ -1,0 +1,13 @@
+name: Test Actions
+
+on:
+  push:
+    branches:
+      - arena/225bb2d6-moonroot
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "GitHub Actions is working!"
