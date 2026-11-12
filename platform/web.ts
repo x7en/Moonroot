@@ -1,4 +1,5 @@
 import type { DateKey, Stamp } from '../core/model/types';
+import { isNativeAndroid, shareOrSaveNativeFile, triggerNativeHaptic } from './native';
 
 export function getLocalDateKey(now: Date = new Date()): DateKey {
   const year = String(now.getFullYear()).padStart(4, '0');
@@ -35,6 +36,18 @@ export function downloadTextFile(filename: string, content: string, mimeType = '
   }, 1000);
 }
 
+export async function exportAppFile(
+  filename: string,
+  content: string,
+  mimeType = 'text/plain;charset=utf-8',
+): Promise<void> {
+  if (isNativeAndroid()) {
+    const handled = await shareOrSaveNativeFile(filename, content);
+    if (handled) return;
+  }
+  downloadTextFile(filename, content, mimeType);
+}
+
 export async function readFileText(file: File): Promise<string> {
   return file.text();
 }
@@ -59,6 +72,10 @@ export function triggerHaptic(
   reducedMotion: boolean,
 ): void {
   if (!enabled || reducedMotion) return;
+  if (isNativeAndroid()) {
+    void triggerNativeHaptic(kind);
+    return;
+  }
   if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
   try {
     navigator.vibrate(kind === 'medium' ? 24 : 10);

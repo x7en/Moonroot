@@ -180,6 +180,61 @@ function walkUiFiles(dir: string): void {
 }
 walkUiFiles(resolve(root, 'ui'));
 walkUiFiles(resolve(root, 'core/ask'));
+walkUiFiles(resolve(root, 'app'));
+
+// Check notification copy and Android widget / discreet strings carry zero health words
+const DISCREET_HEALTH_WORDS =
+  /\b(period|flow|pain|cramp|spotting|pregnant|pregnancy|doctor|symptom|bleed|blood|cycle|ovulation|fever|discharge|menstrua|uterus|vaginal)\b/i;
+
+const reminderFiles = [
+  resolve(root, 'app/reminders.ts'),
+  resolve(root, 'android/app/src/main/res/values/strings.xml'),
+  resolve(root, 'android/app/src/main/res/layout/moonroot_widget.xml'),
+  resolve(root, 'android/app/src/main/res/xml/moonroot_widget_info.xml'),
+  resolve(root, 'android/app/src/main/java/app/moonroot/journal/widget/MoonrootWidgetProvider.kt'),
+];
+
+for (const filePath of reminderFiles) {
+  if (!existsSync(filePath)) continue;
+  const rel = filePath.replace(`${root}/`, '');
+  const content = readFileSync(filePath, 'utf8');
+  if (filePath.endsWith('.xml')) {
+    const textMatches = [
+      ...(content.match(/>([^<]+)</g) ?? []).map((m) => m.slice(1, -1).trim()),
+      ...(content.match(/android:text="([^"]+)"/g) ?? []).map((m) => m.slice(14, -1)),
+    ];
+    for (const txt of textMatches) {
+      if (!txt || txt.startsWith('@')) continue;
+      checkUserCopy(rel, txt);
+      if (DISCREET_HEALTH_WORDS.test(txt)) {
+        violations.push({
+          source: rel,
+          message: `Android widget/launcher XML must carry zero health words: "${txt}"`,
+        });
+      }
+    }
+  } else {
+    const stringLiterals = content.match(/(["'`])(?:\\.|(?!\1).)*\1/g) ?? [];
+    for (const lit of stringLiterals) {
+      const inner = lit.slice(1, -1);
+      if (filePath.endsWith('reminders.ts') && !/Moonroot|Reminders|check-in/i.test(inner)) {
+        continue;
+      }
+      if (filePath.endsWith('MoonrootWidgetProvider.kt') && !/[a-z]{3,}/i.test(inner)) {
+        continue;
+      }
+      if (
+        (filePath.endsWith('reminders.ts') || filePath.endsWith('MoonrootWidgetProvider.kt')) &&
+        DISCREET_HEALTH_WORDS.test(inner)
+      ) {
+        violations.push({
+          source: rel,
+          message: `Reminder/widget literal must carry zero health words: "${inner}"`,
+        });
+      }
+    }
+  }
+}
 
 if (violations.length > 0) {
   console.error('Copy lint failed:');

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Moonroot</string>
+    <string name="title_activity_main">Moonroot</string>
+    <string name="discreet_app_name">Garden Notes</string>
+    <string name="package_name">app.moonroot.journal</string>
+    <string name="custom_url_scheme">moonroot</string>
+    <string name="widget_label">Moonroot</string>
+    <string name="widget_check_in">Check in</string>
+</resources>

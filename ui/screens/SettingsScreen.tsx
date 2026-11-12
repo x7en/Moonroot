@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import type { ReminderPlan } from '../../app/reminders';
 import { APP_VERSION, getRegionOptions, type BackupPreview } from '../../app/store';
 import { canUseTheme, THEME_CATALOGUE } from '../../core/companion/companion';
 import { isUnder18 } from '../../core/model/dates';
@@ -8,12 +9,18 @@ import {
   type DateKey,
   type Profile,
 } from '../../core/model/types';
+import {
+  getDiscreetLauncherIcon,
+  requestNativeNotificationPermission,
+  setDiscreetLauncherIcon,
+} from '../../platform/native';
 import { readFileText } from '../../platform/web';
 
 interface SettingsScreenProps {
   today: DateKey;
   profile: Profile;
   companion?: CompanionState;
+  reminderPlan?: ReminderPlan;
   onSaveProfile: (profile: Profile) => Promise<void>;
   onSetPin: (pin: string | null) => Promise<void>;
   onExportBackup: (passphrase?: string) => Promise<{ filename: string; json: string }>;
@@ -33,6 +40,7 @@ export function SettingsScreen({
     badges: [],
     lastRingDate: null,
   },
+  reminderPlan,
   onSaveProfile,
   onSetPin,
   onExportBackup,
@@ -49,6 +57,8 @@ export function SettingsScreen({
   const [sproutName, setSproutName] = useState(profile.sproutName ?? '');
   const [newPin, setNewPin] = useState('');
   const [pinStatus, setPinStatus] = useState('');
+  const [reminderNotice, setReminderNotice] = useState('');
+  const [discreetIconOn, setDiscreetIconOn] = useState(false);
 
   const [exportPassphrase, setExportPassphrase] = useState('');
   const [exportConfirmNoPass, setExportConfirmNoPass] = useState(false);
@@ -72,6 +82,16 @@ export function SettingsScreen({
       draftRef.current = null;
     }
   }, [profile]);
+
+  useEffect(() => {
+    let active = true;
+    void getDiscreetLauncherIcon().then((enabled) => {
+      if (active) setDiscreetIconOn(enabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function patchProfile(
     updater: Partial<Profile> | ((prev: Profile) => Partial<Profile>),
@@ -447,6 +467,161 @@ export function SettingsScreen({
           )}
         </div>
         {pinStatus && <p style={{ marginBottom: 0 }}>{pinStatus}</p>}
+      </section>
+
+      <section class="card" aria-label="Reminders and discreet mode">
+        <h2 class="card-title">Reminders and discreet mode</h2>
+        <p class="muted" style={{ marginTop: 0 }}>
+          Notifications stay hidden from the lock screen and say only &ldquo;Moonroot: a quick
+          check-in?&rdquo;. At most one reminder is sent per day.
+        </p>
+
+        <div class="field">
+          <label class="chip" style={{ width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={profile.reminders.daily.on}
+              onChange={(e) => {
+                const checked = (e.target as HTMLInputElement).checked;
+                setReminderNotice('');
+                void patchProfile((prev) => ({
+                  reminders: {
+                    ...prev.reminders,
+                    daily: { ...prev.reminders.daily, on: checked },
+                  },
+                }));
+                if (checked) {
+                  void requestNativeNotificationPermission().then((res) => {
+                    if (res === 'denied') {
+                      setReminderNotice(
+                        'Notifications are off in Android settings. Turn them on there to get reminders.',
+                      );
+                    }
+                  });
+                }
+              }}
+            />
+            <span>Daily check-in reminder</span>
+          </label>
+        </div>
+
+        {profile.reminders.daily.on && (
+          <div class="field">
+            <label htmlFor="set-reminder-time">Preferred reminder time</label>
+            <input
+              id="set-reminder-time"
+              class="input"
+              type="time"
+              value={profile.reminders.daily.time}
+              onInput={(e) => {
+                const time = (e.target as HTMLInputElement).value || '20:00';
+                void patchProfile((prev) => ({
+                  reminders: {
+                    ...prev.reminders,
+                    daily: { ...prev.reminders.daily, time },
+                  },
+                }));
+              }}
+            />
+          </div>
+        )}
+
+        <div class="field">
+          <label class="chip" style={{ width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={profile.reminders.watchlist}
+              onChange={(e) => {
+                const checked = (e.target as HTMLInputElement).checked;
+                void patchProfile((prev) => ({
+                  reminders: { ...prev.reminders, watchlist: checked },
+                }));
+              }}
+            />
+            <span>Follow-up check-in reminder</span>
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <div class="field" style={{ flex: 1 }}>
+            <label htmlFor="set-quiet-from">Quiet hours from</label>
+            <input
+              id="set-quiet-from"
+              class="input"
+              type="time"
+              value={profile.reminders.quietFrom}
+              onInput={(e) => {
+                const quietFrom = (e.target as HTMLInputElement).value || '22:00';
+                void patchProfile((prev) => ({
+                  reminders: { ...prev.reminders, quietFrom },
+                }));
+              }}
+            />
+          </div>
+          <div class="field" style={{ flex: 1 }}>
+            <label htmlFor="set-quiet-to">Quiet hours until</label>
+            <input
+              id="set-quiet-to"
+              class="input"
+              type="time"
+              value={profile.reminders.quietTo}
+              onInput={(e) => {
+                const quietTo = (e.target as HTMLInputElement).value || '08:00';
+                void patchProfile((prev) => ({
+                  reminders: { ...prev.reminders, quietTo },
+                }));
+              }}
+            />
+          </div>
+        </div>
+
+        {reminderPlan && reminderPlan.cadence !== 'none' && (
+          <p class="muted" style={{ marginTop: 0 }}>
+            {reminderPlan.droppedToWeekly
+              ? 'After 3 unanswered prompts, cadence drops to weekly until your next check-in.'
+              : `Scheduled as ${reminderPlan.cadence} at ${reminderPlan.effectiveTime}${
+                  reminderPlan.adjustedForQuietHours ? ' (shifted outside quiet hours)' : ''
+                }.`}
+          </p>
+        )}
+        {reminderNotice && (
+          <p class="muted" role="status" style={{ marginTop: 0 }}>
+            {reminderNotice}
+          </p>
+        )}
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', marginBlock: '14px' }} />
+
+        <div class="field">
+          <label class="chip" style={{ width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={profile.discreetMode}
+              onChange={(e) =>
+                void patchProfile({ discreetMode: (e.target as HTMLInputElement).checked })
+              }
+            />
+            <span>Discreet mode (widget shows leaf only)</span>
+          </label>
+        </div>
+
+        <div class="field" style={{ marginBottom: 0 }}>
+          <label class="chip" style={{ width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={discreetIconOn}
+              onChange={(e) => {
+                const checked = (e.target as HTMLInputElement).checked;
+                setDiscreetIconOn(checked);
+                void setDiscreetLauncherIcon(checked);
+              }}
+            />
+            <span>Discreet launcher icon (&ldquo;Garden Notes&rdquo;)</span>
+          </label>
+          <span class="muted">
+            Swaps the Android home-screen app icon and label to a plain leaf called Garden Notes.
+          </span>
+        </div>
       </section>
 
       <section class="card" aria-label="Backup and restore">

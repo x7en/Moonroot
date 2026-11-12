@@ -27,6 +27,7 @@ import {
   prefersReducedMotion,
   triggerHaptic,
 } from '../platform/web';
+import { registerCheckInDeepLink } from '../platform/native';
 import { DoctorFileSheet } from './components/DoctorFileSheet';
 import { GetHelpSheet } from './components/GetHelpSheet';
 import { AskScreen } from './screens/AskScreen';
@@ -74,6 +75,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
 
   useEffect(() => {
     let active = true;
+    let cleanupDeepLink: () => void = () => {};
     void store.init().then(async () => {
       if (store.snapshot.profile && !store.locked) {
         await store.syncTriageState();
@@ -83,8 +85,22 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         refresh();
       }
     });
+    void registerCheckInDeepLink(() => {
+      if (!active) return;
+      setSubView(null);
+      setTab('today');
+      setSelectedDate(getLocalDateKey());
+      refresh();
+    }).then((unsub) => {
+      if (active) {
+        cleanupDeepLink = unsub;
+      } else {
+        unsub();
+      }
+    });
     return () => {
       active = false;
+      cleanupDeepLink();
       if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);
       if (reactionTimerRef.current !== null) window.clearTimeout(reactionTimerRef.current);
       if (petalTimerRef.current !== null) window.clearTimeout(petalTimerRef.current);
@@ -538,6 +554,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             today={today}
             profile={profile}
             companion={store.snapshot.companion}
+            reminderPlan={store.getReminderPlan(today)}
             onSaveProfile={handleSaveProfile}
             onSetPin={async (pin) => {
               await store.setPin(pin);

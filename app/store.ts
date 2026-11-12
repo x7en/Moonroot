@@ -59,7 +59,24 @@ import { createPinLock, verifyPin } from '../data/pin';
 
 export { createPinLock };
 import regionsData from '../data/regions.json';
-import { downloadTextFile, getLocalDateKey, getLocalStamp } from '../platform/web';
+import {
+  applyNativeReminderPlan,
+  clearDeliveredReminders,
+  getDeliveredReminderCount,
+  isNativeAndroid,
+  syncScreenPrivacy,
+  syncWidgetState,
+  writeAutoBackupToDocuments,
+} from '../platform/native';
+import { exportAppFile, getLocalDateKey, getLocalStamp, prefersLightTheme } from '../platform/web';
+import {
+  advanceReminderTracker,
+  computeReminderPlan,
+  defaultReminderTracker,
+  reconcileDeliveredReminders,
+  type ReminderPlan,
+  type ReminderTrackerState,
+} from './reminders';
 
 export const APP_VERSION = '0.2.0';
 
@@ -325,11 +342,59 @@ function hasNewFollowUpAnswer(prev: DayLog | null, next: DayLog): boolean {
   return false;
 }
 
+const REMINDER_TRACKER_STORAGE_KEY = 'moonroot_reminder_tracker';
+
+function resolveWidgetAccent(theme: Profile['theme']): string {
+  const effective = theme === 'auto' || theme === 'system' ? (prefersLightTheme() ? 'dawn' : 'dusk') : theme;
+  switch (effective) {
+    case 'dawn':
+      return '#2A8C64';
+    case 'meadow':
+      return '#6EC4A8';
+    case 'ocean':
+      return '#6AAEDB';
+    case 'rose':
+      return '#D4889E';
+    case 'high-contrast':
+      return '#00E5A3';
+    case 'midnight':
+    case 'dusk':
+    default:
+      return '#7ACBA5';
+  }
+}
+
+function loadReminderTracker(): ReminderTrackerState {
+  try {
+    if (typeof localStorage === 'undefined') return defaultReminderTracker();
+    const raw = localStorage.getItem(REMINDER_TRACKER_STORAGE_KEY);
+    if (!raw) return defaultReminderTracker();
+    const parsed = JSON.parse(raw) as Partial<ReminderTrackerState>;
+    return {
+      ignoredStreak: typeof parsed.ignoredStreak === 'number' ? parsed.ignoredStreak : 0,
+      lastPromptDate: typeof parsed.lastPromptDate === 'string' ? parsed.lastPromptDate : null,
+      lastCheckInDate: typeof parsed.lastCheckInDate === 'string' ? parsed.lastCheckInDate : null,
+    };
+  } catch {
+    return defaultReminderTracker();
+  }
+}
+
+function saveReminderTracker(state: ReminderTrackerState): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(REMINDER_TRACKER_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage quota errors in restricted sandboxes
+  }
+}
+
 export class MoonrootStore {
   readonly storage: IndexedDBStorage;
   snapshot: AppSnapshotData;
   locked = false;
   lastCompanionEvent: CompanionUpdateOutcome | null = null;
+  reminderTracker: ReminderTrackerState = loadReminderTracker();
 
   constructor(storage = new IndexedDBStorage()) {
     this.storage = storage;
@@ -357,9 +422,11 @@ export class MoonrootStore {
   async init(): Promise<void> {
     this.snapshot = await this.storage.exportAll();
     this.locked = this.snapshot.profile?.lock.type === 'pin';
+    await syncScreenPrivacy(this.snapshot.profile?.lock.type === 'pin');
     if (this.snapshot.profile && !this.locked) {
       await this.syncForecasts();
       await this.syncCompanionState();
+      await this.syncNativeEnvironment();
     }
   }
 
@@ -374,6 +441,7 @@ export class MoonrootStore {
       this.locked = false;
       await this.syncForecasts();
       await this.syncCompanionState();
+      await this.syncNativeEnvironment();
     }
     return ok;
   }
@@ -382,6 +450,8 @@ export class MoonrootStore {
     await this.storage.saveProfile(profile);
     this.snapshot = { ...this.snapshot, profile };
     await this.syncForecasts();
+    await syncScreenPrivacy(profile.lock.type === 'pin');
+    await this.syncNativeEnvironment();
   }
 
   async setPin(pin: string | null): Promise<void> {
@@ -703,6 +773,15 @@ export class MoonrootStore {
       sources.push('followup');
     }
     await this.updateCompanionInternal(sources, actionToday);
+    if (isCheckInDayLog(log)) {
+      this.reminderTracker = advanceReminderTracker(this.reminderTracker, actionToday, {
+        hasCheckInToday: true,
+        reminderEnabled: Boolean(this.snapshot.profile?.reminders.daily.on),
+      });
+      saveReminderTracker(this.reminderTracker);
+      await clearDeliveredReminders();
+    }
+    await this.syncNativeEnvironment(actionToday);
     return previous;
   }
 
@@ -872,6 +951,76 @@ export class MoonrootStore {
     return inspectBackupFile(rawText);
   }
 
+  getReminderPlan(today: DateKey = getLocalDateKey()): ReminderPlan {
+    const profile = this.snapshot.profile ?? makeDefaultProfile();
+    const hasOpenWatchItem = this.snapshot.watchItems.some((w) => w.status === 'open');
+    return computeReminderPlan({
+      today,
+      profile,
+      hasOpenWatchItem,
+      tracker: this.reminderTracker,
+    });
+  }
+
+  async syncNativeEnvironment(today: DateKey = getLocalDateKey()): Promise<void> {
+    const profile = this.snapshot.profile;
+    await syncScreenPrivacy(profile?.lock.type === 'pin');
+    if (!profile || this.locked) return;
+
+    const mood = deriveSproutMood({
+      today,
+      dayLogs: this.snapshot.dayLogs,
+      companion: this.snapshot.companion,
+    });
+    await syncWidgetState({
+      stage: this.snapshot.companion.stage,
+      mood,
+      accent: resolveWidgetAccent(profile.theme),
+      discreetMode: profile.discreetMode,
+    });
+
+    const hasCheckInToday = this.snapshot.dayLogs.some(
+      (d) => d.date === today && isCheckInDayLog(d),
+    );
+    const hasOpenWatchItem = this.snapshot.watchItems.some((w) => w.status === 'open');
+    const delivered = await getDeliveredReminderCount();
+    let tracker = advanceReminderTracker(this.reminderTracker, today, {
+      hasCheckInToday,
+      reminderEnabled: profile.reminders.daily.on,
+    });
+    if (!hasCheckInToday) {
+      tracker = reconcileDeliveredReminders(tracker, delivered);
+    }
+    this.reminderTracker = tracker;
+    saveReminderTracker(tracker);
+
+    const plan = computeReminderPlan({
+      today,
+      profile,
+      hasOpenWatchItem,
+      tracker,
+    });
+    await applyNativeReminderPlan(plan);
+
+    if (isNativeAndroid() && this.snapshot.dayLogs.length > 0) {
+      const lastAuto = this.snapshot.meta.lastAutoBackupAt;
+      const stale = !lastAuto || diffDays(lastAuto.slice(0, 10), today) >= 7;
+      if (stale) {
+        const nowIso = getLocalStamp();
+        const json = await createBackupFile(this.snapshot, {
+          appVersion: APP_VERSION,
+          exportedAt: nowIso,
+        });
+        const written = await writeAutoBackupToDocuments(today, json, 4);
+        if (written) {
+          const nextMeta: BackupMeta = { ...this.snapshot.meta, lastAutoBackupAt: nowIso };
+          await this.storage.saveMeta(nextMeta);
+          this.snapshot = { ...this.snapshot, meta: nextMeta };
+        }
+      }
+    }
+  }
+
   async restoreBackup(rawText: string, passphrase?: string): Promise<AppSnapshotData> {
     const restored = await restoreBackupFile(rawText, {
       storage: this.storage,
@@ -883,6 +1032,7 @@ export class MoonrootStore {
     await this.syncTriageState();
     await this.syncForecasts();
     await this.syncCompanionState();
+    await this.syncNativeEnvironment();
     return restored;
   }
 
@@ -890,9 +1040,19 @@ export class MoonrootStore {
     await this.storage.clearAll();
     this.snapshot = await this.storage.exportAll();
     this.locked = false;
+    this.reminderTracker = defaultReminderTracker();
+    saveReminderTracker(this.reminderTracker);
+    await syncScreenPrivacy(false);
+    await applyNativeReminderPlan({
+      cadence: 'none',
+      adjustedForQuietHours: false,
+      effectiveTime: '20:00',
+      droppedToWeekly: false,
+      notifications: [],
+    });
   }
 
   downloadFile(filename: string, content: string, mimeType?: string): void {
-    downloadTextFile(filename, content, mimeType);
+    void exportAppFile(filename, content, mimeType);
   }
 }

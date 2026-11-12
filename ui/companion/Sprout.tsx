@@ -1,5 +1,17 @@
-import type { CompanionStage, SproutMood, SproutReaction } from '../../core/model/types';
 import { getStageDefinition } from '../../core/companion/companion';
+import {
+  SPROUT_BUD,
+  SPROUT_FLOWER_CENTER,
+  SPROUT_FLOWER_PETALS,
+  SPROUT_LEAF_PAIRS,
+  SPROUT_POT,
+  SPROUT_SEED,
+  SPROUT_SOIL_PATH,
+  SPROUT_STEM_PATHS,
+  SPROUT_TENDRIL_PATH,
+  SPROUT_VIEWBOX_SIZE,
+} from '../../core/companion/sproutArt';
+import type { CompanionStage, SproutMood, SproutReaction } from '../../core/model/types';
 
 export interface SproutProps {
   stage: CompanionStage;
@@ -71,7 +83,7 @@ export function Sprout({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 120 120"
+      viewBox={`0 0 ${SPROUT_VIEWBOX_SIZE} ${SPROUT_VIEWBOX_SIZE}`}
       role="img"
       aria-label={`${labelName}, ${stageDef.name} stage (${stage} of 6), ${mood} mood, ${rings} rings`}
       data-stage={stage}
@@ -107,17 +119,17 @@ export function Sprout({
       {/* Terracotta-slate garden pot & soil mound */}
       <g id="pot">
         <rect
-          x="33"
-          y="78"
-          width="54"
-          height="8"
-          rx="4"
+          x={SPROUT_POT.rim.x}
+          y={SPROUT_POT.rim.y}
+          width={SPROUT_POT.rim.width}
+          height={SPROUT_POT.rim.height}
+          rx={SPROUT_POT.rim.rx}
           fill="var(--surface-2)"
           stroke="var(--gut)"
           strokeWidth="1.75"
         />
         <path
-          d="M38 86 L82 86 L76 109 Q75 112 72 112 L48 112 Q45 112 44 109 Z"
+          d={SPROUT_POT.bodyPath}
           fill="var(--surface-2)"
           stroke="var(--gut)"
           strokeWidth="1.75"
@@ -125,26 +137,22 @@ export function Sprout({
       </g>
 
       <g id="soil">
-        <path
-          d="M36 78 Q60 69 84 78 Z"
-          fill="var(--gut)"
-          opacity="0.88"
-        />
+        <path d={SPROUT_SOIL_PATH} fill="var(--gut)" opacity="0.88" />
       </g>
 
       {/* Stage 0: Seed tucked warmly beneath soil */}
       {stage === 0 && (
         <g id="seed">
           <ellipse
-            cx="60"
-            cy="74"
-            rx="7"
-            ry="5"
+            cx={SPROUT_SEED.cx}
+            cy={SPROUT_SEED.cy}
+            rx={SPROUT_SEED.rx}
+            ry={SPROUT_SEED.ry}
             fill="var(--lamp)"
             opacity="0.92"
           />
           <path
-            d="M60 69 Q62 63 65 62"
+            d={SPROUT_SEED.shootPath}
             fill="none"
             stroke="var(--accent)"
             strokeWidth="2"
@@ -158,15 +166,7 @@ export function Sprout({
         <g id="plant-body">
           <g id="stem">
             <path
-              d={
-                stage === 1
-                  ? 'M60 76 Q60 64 60 56'
-                  : stage === 2
-                    ? 'M60 76 Q58 60 60 44'
-                    : stage <= 4
-                      ? 'M60 76 Q57 56 60 36'
-                      : 'M60 76 Q56 54 60 30'
-              }
+              d={SPROUT_STEM_PATHS[stage as 1 | 2 | 3 | 4 | 5 | 6]}
               fill="none"
               stroke="var(--accent)"
               strokeWidth={stage >= 3 ? '3.5' : '3'}
@@ -175,72 +175,16 @@ export function Sprout({
           </g>
 
           <g id="leaves" transform={leafPostureTransform}>
-            {/* Pair 1: lower leaves (stages 1-6) */}
-            <path
-              d="M60 62 C50 60 44 52 46 47 C52 48 58 54 60 62 Z"
-              fill="var(--accent)"
-              opacity="0.92"
-            />
-            <path
-              d="M60 60 C70 58 76 50 74 45 C68 46 62 52 60 60 Z"
-              fill="var(--accent)"
-              opacity="0.82"
-            />
-
-            {/* Pair 2: mid-stem leaves (stages 2-6) */}
-            {stage >= 2 && (
-              <>
-                <path
-                  d="M59 50 C48 48 41 39 44 33 C51 35 57 41 59 50 Z"
-                  fill="var(--accent)"
-                  opacity="0.88"
-                />
-                <path
-                  d="M60 48 C71 46 78 37 75 31 C68 33 62 39 60 48 Z"
-                  fill="var(--accent)"
-                  opacity="0.78"
-                />
-              </>
-            )}
-
-            {/* Pair 3: upper foliage leaves (stages 3-6) */}
-            {stage >= 3 && (
-              <>
-                <path
-                  d="M60 40 C50 37 45 29 48 24 C54 26 58 32 60 40 Z"
-                  fill="var(--accent)"
-                  opacity="0.95"
-                />
-                <path
-                  d="M60 39 C70 36 75 28 72 23 C66 25 62 31 60 39 Z"
-                  fill="var(--accent)"
-                  opacity="0.86"
-                />
-              </>
-            )}
-
-            {/* Pair 4: crown leaves (stages 5-6) */}
-            {stage >= 5 && (
-              <>
-                <path
-                  d="M58 68 C47 68 41 62 43 57 C49 58 55 62 58 68 Z"
-                  fill="var(--accent)"
-                  opacity="0.74"
-                />
-                <path
-                  d="M62 67 C73 67 79 61 77 56 C71 57 65 61 62 67 Z"
-                  fill="var(--accent)"
-                  opacity="0.74"
-                />
-              </>
-            )}
+            {SPROUT_LEAF_PAIRS.filter((leaf) => stage >= leaf.minStage).map((leaf, idx) => (
+              <path key={idx} d={leaf.d} fill="var(--accent)" opacity={String(leaf.opacity)} />
+            ))}
           </g>
 
           {/* Tendril (stages 3-6) */}
           {stage >= 3 && (
             <g id="tendril">
               <path
-                d="M59 44 C51 42 46 49 51 54 C54 57 57 53 54 50"
+                d={SPROUT_TENDRIL_PATH}
                 fill="none"
                 stroke="var(--accent)"
                 strokeWidth="2"
@@ -253,13 +197,9 @@ export function Sprout({
           {/* Closed bud (stage 4) */}
           {stage === 4 && (
             <g id="bud">
+              <path d={SPROUT_BUD.bulbPath} fill="var(--lamp)" opacity="0.95" />
               <path
-                d="M60 21 C53 27 54 36 60 37 C66 36 67 27 60 21 Z"
-                fill="var(--lamp)"
-                opacity="0.95"
-              />
-              <path
-                d="M55 33 Q60 38 65 33"
+                d={SPROUT_BUD.sepalPath}
                 fill="none"
                 stroke="var(--accent)"
                 strokeWidth="2"
@@ -271,51 +211,40 @@ export function Sprout({
           {/* Open flower (stage 5) and luminous Moonflower (stage 6) */}
           {stage >= 5 && (
             <g id="flower">
-              <ellipse
-                cx="60"
-                cy="20"
-                rx="5"
-                ry="8"
-                fill={stage === 6 ? 'var(--text)' : 'var(--lamp)'}
-                opacity="0.92"
+              {SPROUT_FLOWER_PETALS.map((petal, idx) => {
+                const fill =
+                  stage === 6
+                    ? petal.role === 'upper'
+                      ? 'var(--text)'
+                      : 'var(--accent)'
+                    : 'var(--lamp)';
+                return (
+                  <ellipse
+                    key={idx}
+                    cx={petal.cx}
+                    cy={petal.cy}
+                    rx={petal.rx}
+                    ry={petal.ry}
+                    transform={
+                      petal.rotateDeg !== 0
+                        ? `rotate(${petal.rotateDeg} ${petal.cx} ${petal.cy})`
+                        : undefined
+                    }
+                    fill={fill}
+                    opacity={String(petal.opacity)}
+                  />
+                );
+              })}
+              <circle
+                cx={SPROUT_FLOWER_CENTER.cx}
+                cy={SPROUT_FLOWER_CENTER.cy}
+                r={
+                  stage === 6
+                    ? String(SPROUT_FLOWER_CENTER.radiusStage6)
+                    : String(SPROUT_FLOWER_CENTER.radiusStage5)
+                }
+                fill="var(--lamp)"
               />
-              <ellipse
-                cx="51"
-                cy="25"
-                rx="7"
-                ry="4.5"
-                transform="rotate(-24 51 25)"
-                fill={stage === 6 ? 'var(--text)' : 'var(--lamp)'}
-                opacity="0.88"
-              />
-              <ellipse
-                cx="69"
-                cy="25"
-                rx="7"
-                ry="4.5"
-                transform="rotate(24 69 25)"
-                fill={stage === 6 ? 'var(--text)' : 'var(--lamp)'}
-                opacity="0.88"
-              />
-              <ellipse
-                cx="53"
-                cy="33"
-                rx="6"
-                ry="4"
-                transform="rotate(20 53 33)"
-                fill={stage === 6 ? 'var(--accent)' : 'var(--lamp)'}
-                opacity="0.82"
-              />
-              <ellipse
-                cx="67"
-                cy="33"
-                rx="6"
-                ry="4"
-                transform="rotate(-20 67 33)"
-                fill={stage === 6 ? 'var(--accent)' : 'var(--lamp)'}
-                opacity="0.82"
-              />
-              <circle cx="60" cy="27" r={stage === 6 ? '5.5' : '4.5'} fill="var(--lamp)" />
             </g>
           )}
         </g>
@@ -386,7 +315,10 @@ export function Sprout({
         {showMotionParticles && reaction === 'other' && (
           <g class="reaction-sparkle">
             <path d="M35 28 L37 33 L42 35 L37 37 L35 42 L33 37 L28 35 L33 33 Z" fill="var(--lamp)" />
-            <path d="M86 24 L87.5 28 L91.5 29.5 L87.5 31 L86 35 L84.5 31 L80.5 29.5 L84.5 28 Z" fill="var(--accent)" />
+            <path
+              d="M86 24 L87.5 28 L91.5 29.5 L87.5 31 L86 35 L84.5 31 L80.5 29.5 L84.5 28 Z"
+              fill="var(--accent)"
+            />
           </g>
         )}
 

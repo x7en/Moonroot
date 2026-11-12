@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { createPinLock, makeDefaultProfile } from '../../app/store';
 import { isUnder18 } from '../../core/model/dates';
 import type { DateKey, Profile } from '../../core/model/types';
+import { requestNativeNotificationPermission } from '../../platform/native';
 
 interface OnboardingScreenProps {
   today: DateKey;
@@ -72,6 +73,10 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
 
       if (pinInput.trim().length >= 4) {
         profile.lock = await createPinLock(pinInput.trim());
+      }
+
+      if (dailyReminderOn) {
+        await requestNativeNotificationPermission();
       }
 
       await onComplete(profile);
@@ -310,7 +315,7 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
               checked={dailyReminderOn}
               onChange={(e) => setDailyReminderOn((e.target as HTMLInputElement).checked)}
             />
-            <span>Save a preferred daily check-in time (Android reminders arrive in Step 7)</span>
+            <span>Daily check-in reminder (no health words on lock screen)</span>
           </label>
           {dailyReminderOn && (
             <div class="field">
