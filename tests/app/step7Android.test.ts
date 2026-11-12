@@ -395,6 +395,24 @@ describe('Step 7 Capacitor native bridge & Android project checks', () => {
     expect(manifest).toContain('.LauncherDiscreet');
     expect(manifest).toContain('.widget.MoonrootWidgetProvider');
 
+    const widgetBackground = readFileSync(
+      resolve(root, 'android/app/src/main/res/drawable/widget_bg.xml'),
+      'utf8',
+    );
+    expect(widgetBackground).toContain('#CFD78C');
+    expect(widgetBackground).toContain('#700143');
+    const widgetButton = readFileSync(
+      resolve(root, 'android/app/src/main/res/drawable/widget_btn_bg.xml'),
+      'utf8',
+    );
+    expect(widgetButton).toContain('#700143');
+    const launcherBackground = readFileSync(
+      resolve(root, 'android/app/src/main/res/values/ic_launcher_background.xml'),
+      'utf8',
+    );
+    expect(launcherBackground).toContain('#F9F6BD');
+    expect(launcherBackground).toContain('#700143');
+
     const workflow = readFileSync(resolve(root, '.github/workflows/android.yml'), 'utf8');
     expect(workflow).toContain('actions/checkout@v4');
     expect(workflow).toContain('actions/setup-node@v4');

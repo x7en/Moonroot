@@ -13,7 +13,7 @@
         android:layout_width="40dp"
         android:layout_height="3dp"
         android:layout_marginBottom="4dp"
-        android:background="#7ACBA5" />
+        android:background="#700143" />
 
     <ImageView
         android:id="@+id/widget_sprout_image"
@@ -34,7 +34,7 @@
         android:paddingRight="10dp"
         android:text="@string/widget_check_in"
         android:textAllCaps="false"
-        android:textColor="#0F1C16"
+        android:textColor="#F9F6BD"
         android:textSize="13sp"
         android:textStyle="bold" />
 

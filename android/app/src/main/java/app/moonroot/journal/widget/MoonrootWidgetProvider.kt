@@ -47,7 +47,7 @@ class MoonrootWidgetProvider : AppWidgetProvider() {
             )
             val stage = prefs.getInt(WidgetBridgePlugin.KEY_STAGE, 0).coerceIn(0, 6)
             val mood = prefs.getString(WidgetBridgePlugin.KEY_MOOD, "calm") ?: "calm"
-            val accentRaw = prefs.getString(WidgetBridgePlugin.KEY_ACCENT, "#7ACBA5") ?: "#7ACBA5"
+            val accentRaw = prefs.getString(WidgetBridgePlugin.KEY_ACCENT, "#700143") ?: "#700143"
 
             val views = RemoteViews(context.packageName, R.layout.moonroot_widget)
 
@@ -61,7 +61,7 @@ class MoonrootWidgetProvider : AppWidgetProvider() {
             val parsedAccent = try {
                 Color.parseColor(accentRaw)
             } catch (_: IllegalArgumentException) {
-                Color.parseColor("#7ACBA5")
+                Color.parseColor("#700143")
             }
             views.setInt(R.id.widget_accent_bar, "setBackgroundColor", parsedAccent)
 
