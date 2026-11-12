@@ -54,14 +54,17 @@ export function Sprout({
         ? 'translate(0 2) rotate(5 60 72)'
         : undefined;
 
-  const glowOpacity =
-    reducedMotion && (reaction !== null || petalBurst)
-      ? 0.52
-      : mood === 'bright' || mood === 'welcome' || stage === 6
-        ? 0.34
-        : 0.14;
+  const staticGlowActive =
+    reducedMotion &&
+    ((reaction !== null && stage >= 1) || (petalBurst && stage >= 2));
 
-  const showMotionParticles = !reducedMotion && reaction !== null;
+  const glowOpacity = staticGlowActive
+    ? 0.52
+    : mood === 'bright' || mood === 'welcome' || stage === 6
+      ? 0.34
+      : 0.14;
+
+  const showMotionParticles = !reducedMotion && reaction !== null && stage >= 1;
   const showPetalBurst = !reducedMotion && petalBurst && stage >= 2;
 
   return (
@@ -73,14 +76,14 @@ export function Sprout({
       aria-label={`${labelName}, ${stageDef.name} stage (${stage} of 6), ${mood} mood, ${rings} rings`}
       data-stage={stage}
       data-mood={mood}
-      data-reaction={reaction ?? 'none'}
+      data-reaction={stage >= 1 ? (reaction ?? 'none') : 'none'}
       data-reduced-motion={reducedMotion ? 'true' : 'false'}
-      data-petal-burst={petalBurst ? 'true' : 'false'}
+      data-petal-burst={petalBurst && stage >= 2 ? 'true' : 'false'}
       data-stage-up={stageUp ? 'true' : 'false'}
       class={`sprout-svg ${moodClass} ${motionClass}`}
     >
       {/* Ambient / moonflower / reduced-motion static glow */}
-      <g id="glow" data-static-glow={reducedMotion && (reaction !== null || petalBurst) ? 'true' : 'false'}>
+      <g id="glow" data-static-glow={staticGlowActive ? 'true' : 'false'}>
         <circle
           cx="60"
           cy={stage === 0 ? 78 : 54}

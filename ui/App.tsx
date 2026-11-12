@@ -194,7 +194,10 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   async function handleSaveDayLog(log: DayLog): Promise<void> {
     const prev = await store.saveDayLog(log);
     triggerHaptic('light', hapticsEnabled, reducedMotion);
-    fireReaction('other');
+    const currentStage = store.lastCompanionEvent?.newStage ?? store.snapshot.companion.stage;
+    if (currentStage >= 1) {
+      fireReaction('other');
+    }
     applyCompanionOutcome(store.lastCompanionEvent);
     refresh();
     setUndoState({ date: log.date, previous: prev });
@@ -229,7 +232,10 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         : mealsChanged
           ? 'meal'
           : 'other';
-    fireReaction(reaction);
+    const currentStage = store.lastCompanionEvent?.newStage ?? store.snapshot.companion.stage;
+    if (currentStage >= 1) {
+      fireReaction(reaction);
+    }
     applyCompanionOutcome(store.lastCompanionEvent);
     refresh();
   }

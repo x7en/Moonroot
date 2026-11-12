@@ -239,6 +239,21 @@ describe('core/companion/companion', () => {
     expect(canUseTheme('rose', s0)).toBe(false);
     expect(canUseTheme('midnight', s0)).toBe(false);
 
+    const s2 = makeCompanion({ rings: 10, stage: 2 });
+    const s3 = makeCompanion({ rings: 25, stage: 3 });
+    const s4 = makeCompanion({ rings: 50, stage: 4 });
+    const s5 = makeCompanion({ rings: 90, stage: 5 });
+    const s6 = makeCompanion({ rings: 150, stage: 6 });
+
+    expect(canUseTheme('meadow', s2)).toBe(false);
+    expect(canUseTheme('meadow', s3)).toBe(true);
+    expect(canUseTheme('ocean', s3)).toBe(false);
+    expect(canUseTheme('ocean', s4)).toBe(true);
+    expect(canUseTheme('rose', s4)).toBe(false);
+    expect(canUseTheme('rose', s5)).toBe(true);
+    expect(canUseTheme('midnight', s5)).toBe(false);
+    expect(canUseTheme('midnight', s6)).toBe(true);
+
     expect(THEME_CATALOGUE.filter((t) => !t.alwaysAvailable).map((t) => [t.id, t.requiredStage])).toEqual([
       ['meadow', 3],
       ['ocean', 4],

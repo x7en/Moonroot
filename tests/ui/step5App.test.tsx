@@ -107,6 +107,26 @@ describe('Step 5 Companion sprout, ring economy, stages, badges, weekly review, 
       unmount();
     }
 
+    // Stage 0 Seed NEVER shows raindrops, moonbeams, sunbeams, or sparkles
+    for (const r of ['water', 'sleep', 'meal', 'other'] as const) {
+      const seedReaction = render(<Sprout stage={0} mood="bright" rings={1} reaction={r} />);
+      expect(seedReaction.container.querySelector('#particles')?.children.length).toBe(0);
+      expect(seedReaction.container.querySelector('svg')?.getAttribute('data-reaction')).toBe('none');
+      seedReaction.unmount();
+    }
+
+    // From Stage 1 onward, Body-log reactions are allowed (and still obey reduced motion)
+    for (const [r, cls] of [
+      ['water', '.reaction-raindrops'],
+      ['sleep', '.reaction-moonbeam'],
+      ['meal', '.reaction-sunbeam'],
+      ['other', '.reaction-sparkle'],
+    ] as const) {
+      const s1 = render(<Sprout stage={1} mood="bright" rings={3} reaction={r} />);
+      expect(s1.container.querySelector(cls)).not.toBeNull();
+      s1.unmount();
+    }
+
     // With reducedMotion=false at stage 3, water reaction shows raindrops particles
     const animated = render(
       <Sprout stage={3} mood="bright" rings={30} reaction="water" reducedMotion={false} />,
@@ -242,6 +262,9 @@ describe('Step 5 Companion sprout, ring economy, stages, badges, weekly review, 
     expect(container.querySelector('[data-mood="welcome"]')).not.toBeNull();
     expect(screen.getByText(/Welcome back · 26 rings/i)).toBeTruthy();
 
+    // Verify Stage 3 has night-garden OFF, then promote to Stage 6 Moonflower -> night-garden ON
+    expect(document.documentElement.getAttribute('data-night-garden')).toBe('false');
+
     // Switch to Body -> log Sleep -> triggers moonbeam reaction & +1 ring (26 -> 27, daily cap 2)
     fireEvent.click(screen.getByRole('button', { name: 'Body' }));
     fireEvent.click(await screen.findByRole('button', { name: '7h' }));
@@ -300,5 +323,28 @@ describe('Step 5 Companion sprout, ring economy, stages, badges, weekly review, 
     });
     expect(lockSvg?.getAttribute('data-mood')).toBe('calm');
     expect(lockSvg?.getAttribute('data-reduced-motion')).toBe('true');
+
+    // Stage 6 Moonflower unlocks Midnight theme + night-garden backdrop (not shown at Stages 0-5)
+    fireEvent.input(screen.getByLabelText('PIN'), { target: { value: '4829' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }));
+    await screen.findByRole('button', { name: 'Settings' });
+    store.snapshot.companion = {
+      rings: 150,
+      stage: 6,
+      unlocked: ['dusk', 'dawn', 'high-contrast', 'meadow', 'ocean', 'rose', 'midnight'],
+      badges: ['first-light'],
+      lastRingDate: today,
+      lastCheckInDate: today,
+    };
+    await store.storage.saveCompanion(store.snapshot.companion);
+    await store.syncCompanionState(today);
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute('data-night-garden')).toBe('true'),
+    );
+    const midnightBtn = await screen.findByRole('button', { name: 'Midnight' });
+    expect((midnightBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(midnightBtn);
+    await waitFor(() => expect(document.documentElement.getAttribute('data-theme')).toBe('midnight'));
   });
 });
