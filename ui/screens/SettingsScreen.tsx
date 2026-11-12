@@ -1,12 +1,26 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import type { ReminderPlan } from '../../app/reminders';
 import { APP_VERSION, getRegionOptions, type BackupPreview } from '../../app/store';
+import { canUseTheme, THEME_CATALOGUE } from '../../core/companion/companion';
 import { isUnder18 } from '../../core/model/dates';
-import { RULESET_VERSION, type DateKey, type Profile } from '../../core/model/types';
+import {
+  RULESET_VERSION,
+  type CompanionState,
+  type DateKey,
+  type Profile,
+} from '../../core/model/types';
+import {
+  getDiscreetLauncherIcon,
+  requestNativeNotificationPermission,
+  setDiscreetLauncherIcon,
+} from '../../platform/native';
 import { readFileText } from '../../platform/web';
 
 interface SettingsScreenProps {
   today: DateKey;
   profile: Profile;
+  companion?: CompanionState;
+  reminderPlan?: ReminderPlan;
   onSaveProfile: (profile: Profile) => Promise<void>;
   onSetPin: (pin: string | null) => Promise<void>;
   onExportBackup: (passphrase?: string) => Promise<{ filename: string; json: string }>;
@@ -19,6 +33,14 @@ interface SettingsScreenProps {
 export function SettingsScreen({
   today,
   profile,
+  companion = {
+    rings: 0,
+    stage: 0,
+    unlocked: ['dusk', 'dawn', 'high-contrast'],
+    badges: [],
+    lastRingDate: null,
+  },
+  reminderPlan,
   onSaveProfile,
   onSetPin,
   onExportBackup,
@@ -35,6 +57,8 @@ export function SettingsScreen({
   const [sproutName, setSproutName] = useState(profile.sproutName ?? '');
   const [newPin, setNewPin] = useState('');
   const [pinStatus, setPinStatus] = useState('');
+  const [reminderNotice, setReminderNotice] = useState('');
+  const [discreetIconOn, setDiscreetIconOn] = useState(false);
 
   const [exportPassphrase, setExportPassphrase] = useState('');
   const [exportConfirmNoPass, setExportConfirmNoPass] = useState(false);
@@ -49,14 +73,55 @@ export function SettingsScreen({
   const [deleteStep, setDeleteStep] = useState<0 | 1>(0);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
+  const draftRef = useRef<Profile | null>(null);
+  const pendingWritesRef = useRef(0);
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    if (pendingWritesRef.current === 0) {
+      draftRef.current = null;
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    let active = true;
+    void getDiscreetLauncherIcon().then((enabled) => {
+      if (active) setDiscreetIconOn(enabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function patchProfile(
+    updater: Partial<Profile> | ((prev: Profile) => Partial<Profile>),
+  ): Promise<void> {
+    const base = draftRef.current ?? profile;
+    const patch = typeof updater === 'function' ? updater(base) : updater;
+    const next: Profile = { ...base, ...patch };
+    draftRef.current = next;
+    pendingWritesRef.current += 1;
+    const run = saveChainRef.current.then(async () => {
+      try {
+        await onSaveProfile(next);
+      } finally {
+        pendingWritesRef.current -= 1;
+        if (pendingWritesRef.current === 0 && draftRef.current === next) {
+          draftRef.current = null;
+        }
+      }
+    });
+    saveChainRef.current = run;
+    return run;
+  }
+
   const regions = getRegionOptions();
   const under18 = isUnder18(profile, today);
 
   function saveTextProfileChanges(): void {
     const parsedYear =
       birthYear.trim() !== '' && Number.isFinite(Number(birthYear)) ? Number(birthYear) : null;
-    void onSaveProfile({
-      ...profile,
+    void patchProfile((prev) => ({
       birthYear: parsedYear,
       conditionsNote: conditionsNote.trim(),
       medicationsNote: medicationsNote.trim(),
@@ -64,8 +129,8 @@ export function SettingsScreen({
       intimacy:
         parsedYear === null || Number(today.slice(0, 4)) - parsedYear < 18
           ? 'prefer-not-to-say'
-          : profile.intimacy,
-    });
+          : prev.intimacy,
+    }));
   }
 
   async function handleSavePin(): Promise<void> {
@@ -144,23 +209,63 @@ export function SettingsScreen({
         <div class="field">
           <span class="field-label">Theme</span>
           <div class="chip-group">
-            {(
-              [
-                { value: 'dusk', label: 'Dusk (night)' },
-                { value: 'dawn', label: 'Dawn (day)' },
-                { value: 'high-contrast', label: 'High contrast' },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                class="chip"
-                aria-pressed={profile.theme === opt.value}
-                onClick={() => void onSaveProfile({ ...profile, theme: opt.value })}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {THEME_CATALOGUE.map((opt) => {
+              const unlocked = canUseTheme(opt.id, companion);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  class="chip"
+                  disabled={!unlocked}
+                  aria-pressed={profile.theme === opt.id}
+                  title={opt.note}
+                  onClick={() => {
+                    if (unlocked) void patchProfile({ theme: opt.id });
+                  }}
+                >
+                  {unlocked ? opt.label : `${opt.label} (Stage ${opt.requiredStage})`}
+                </button>
+              );
+            })}
+          </div>
+          <p class="muted" style={{ margin: '6px 0 0 0' }}>
+            Dusk, Dawn, Match phone, and High contrast are always unlocked.
+          </p>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Motion and touch</span>
+          <div class="chip-group">
+            <label class="chip">
+              <input
+                type="checkbox"
+                checked={Boolean(profile.reducedMotion)}
+                onChange={(e) =>
+                  void patchProfile({ reducedMotion: (e.target as HTMLInputElement).checked })
+                }
+              />
+              <span>Reduce motion</span>
+            </label>
+            <label class="chip">
+              <input
+                type="checkbox"
+                checked={profile.haptics !== false}
+                onChange={(e) =>
+                  void patchProfile({ haptics: (e.target as HTMLInputElement).checked })
+                }
+              />
+              <span>Light haptics</span>
+            </label>
+            <label class="chip">
+              <input
+                type="checkbox"
+                checked={Boolean(profile.sound)}
+                onChange={(e) =>
+                  void patchProfile({ sound: (e.target as HTMLInputElement).checked })
+                }
+              />
+              <span>Gentle sounds</span>
+            </label>
           </div>
         </div>
 
@@ -174,13 +279,38 @@ export function SettingsScreen({
                 class="chip"
                 aria-pressed={profile.units.temperature === unit}
                 onClick={() =>
-                  void onSaveProfile({
-                    ...profile,
-                    units: { ...profile.units, temperature: unit },
-                  })
+                  void patchProfile((prev) => ({
+                    units: { ...prev.units, temperature: unit },
+                  }))
                 }
               >
                 °{unit}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div class="field">
+          <span class="field-label">Water unit</span>
+          <div class="chip-group">
+            {(
+              [
+                { value: 'ml', label: 'ml' },
+                { value: 'glasses', label: 'glasses (250 ml)' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                class="chip"
+                aria-pressed={profile.units.water === opt.value}
+                onClick={() =>
+                  void patchProfile((prev) => ({
+                    units: { ...prev.units, water: opt.value },
+                  }))
+                }
+              >
+                {opt.label}
               </button>
             ))}
           </div>
@@ -193,7 +323,7 @@ export function SettingsScreen({
             class="select"
             value={profile.region}
             onChange={(e) =>
-              void onSaveProfile({ ...profile, region: (e.target as HTMLSelectElement).value })
+              void patchProfile({ region: (e.target as HTMLSelectElement).value })
             }
           >
             {regions.map((r) => (
@@ -234,7 +364,7 @@ export function SettingsScreen({
                 type="button"
                 class="chip"
                 aria-pressed={profile.onHormones === opt.value}
-                onClick={() => void onSaveProfile({ ...profile, onHormones: opt.value })}
+                onClick={() => void patchProfile({ onHormones: opt.value })}
               >
                 {opt.label}
               </button>
@@ -252,7 +382,7 @@ export function SettingsScreen({
                   class="chip"
                   aria-pressed={profile.sexualHealthQuestions === opt}
                   onClick={() =>
-                    void onSaveProfile({ ...profile, sexualHealthQuestions: opt })
+                    void patchProfile({ sexualHealthQuestions: opt })
                   }
                 >
                   {opt === 'when-relevant' ? 'When relevant' : 'Off'}
@@ -337,6 +467,161 @@ export function SettingsScreen({
           )}
         </div>
         {pinStatus && <p style={{ marginBottom: 0 }}>{pinStatus}</p>}
+      </section>
+
+      <section class="card" aria-label="Reminders and discreet mode">
+        <h2 class="card-title">Reminders and discreet mode</h2>
+        <p class="muted" style={{ marginTop: 0 }}>
+          Notifications stay hidden from the lock screen and say only &ldquo;Moonroot: a quick
+          check-in?&rdquo;. At most one reminder is sent per day.
+        </p>
+
+        <div class="field">
+          <label class="chip" style={{ width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={profile.reminders.daily.on}
+              onChange={(e) => {
+                const checked = (e.target as HTMLInputElement).checked;
+                setReminderNotice('');
+                void patchProfile((prev) => ({
+                  reminders: {
+                    ...prev.reminders,
+                    daily: { ...prev.reminders.daily, on: checked },
+                  },
+                }));
+                if (checked) {
+                  void requestNativeNotificationPermission().then((res) => {
+                    if (res === 'denied') {
+                      setReminderNotice(
+                        'Notifications are off in Android settings. Turn them on there to get reminders.',
+                      );
+                    }
+                  });
+                }
+              }}
+            />
+            <span>Daily check-in reminder</span>
+          </label>
+        </div>
+
+        {profile.reminders.daily.on && (
+          <div class="field">
+            <label htmlFor="set-reminder-time">Preferred reminder time</label>
+            <input
+              id="set-reminder-time"
+              class="input"
+              type="time"
+              value={profile.reminders.daily.time}
+              onInput={(e) => {
+                const time = (e.target as HTMLInputElement).value || '20:00';
+                void patchProfile((prev) => ({
+                  reminders: {
+                    ...prev.reminders,
+                    daily: { ...prev.reminders.daily, time },
+                  },
+                }));
+              }}
+            />
+          </div>
+        )}
+
+        <div class="field">
+          <label class="chip" style={{ width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={profile.reminders.watchlist}
+              onChange={(e) => {
+                const checked = (e.target as HTMLInputElement).checked;
+                void patchProfile((prev) => ({
+                  reminders: { ...prev.reminders, watchlist: checked },
+                }));
+              }}
+            />
+            <span>Follow-up check-in reminder</span>
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <div class="field" style={{ flex: 1 }}>
+            <label htmlFor="set-quiet-from">Quiet hours from</label>
+            <input
+              id="set-quiet-from"
+              class="input"
+              type="time"
+              value={profile.reminders.quietFrom}
+              onInput={(e) => {
+                const quietFrom = (e.target as HTMLInputElement).value || '22:00';
+                void patchProfile((prev) => ({
+                  reminders: { ...prev.reminders, quietFrom },
+                }));
+              }}
+            />
+          </div>
+          <div class="field" style={{ flex: 1 }}>
+            <label htmlFor="set-quiet-to">Quiet hours until</label>
+            <input
+              id="set-quiet-to"
+              class="input"
+              type="time"
+              value={profile.reminders.quietTo}
+              onInput={(e) => {
+                const quietTo = (e.target as HTMLInputElement).value || '08:00';
+                void patchProfile((prev) => ({
+                  reminders: { ...prev.reminders, quietTo },
+                }));
+              }}
+            />
+          </div>
+        </div>
+
+        {reminderPlan && reminderPlan.cadence !== 'none' && (
+          <p class="muted" style={{ marginTop: 0 }}>
+            {reminderPlan.droppedToWeekly
+              ? 'After 3 unanswered prompts, cadence drops to weekly until your next check-in.'
+              : `Scheduled as ${reminderPlan.cadence} at ${reminderPlan.effectiveTime}${
+                  reminderPlan.adjustedForQuietHours ? ' (shifted outside quiet hours)' : ''
+                }.`}
+          </p>
+        )}
+        {reminderNotice && (
+          <p class="muted" role="status" style={{ marginTop: 0 }}>
+            {reminderNotice}
+          </p>
+        )}
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', marginBlock: '14px' }} />
+
+        <div class="field">
+          <label class="chip" style={{ width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={profile.discreetMode}
+              onChange={(e) =>
+                void patchProfile({ discreetMode: (e.target as HTMLInputElement).checked })
+              }
+            />
+            <span>Discreet mode (widget shows leaf only)</span>
+          </label>
+        </div>
+
+        <div class="field" style={{ marginBottom: 0 }}>
+          <label class="chip" style={{ width: '100%' }}>
+            <input
+              type="checkbox"
+              checked={discreetIconOn}
+              onChange={(e) => {
+                const checked = (e.target as HTMLInputElement).checked;
+                setDiscreetIconOn(checked);
+                void setDiscreetLauncherIcon(checked);
+              }}
+            />
+            <span>Discreet launcher icon (&ldquo;Garden Notes&rdquo;)</span>
+          </label>
+          <span class="muted">
+            Swaps the Android home-screen app icon and label to a plain leaf called Garden Notes.
+          </span>
+        </div>
       </section>
 
       <section class="card" aria-label="Backup and restore">
@@ -437,8 +722,8 @@ export function SettingsScreen({
           does not diagnose.
         </p>
         <p class="muted" style={{ marginBottom: 0 }}>
-          Step 2 build: check-in intelligence, cycle derivation, watch checks and clinical review
-          doctor summary active on-device.
+          Companion, ovulation tracking, lifestyle patterns, check-in intelligence, and clinical
+          doctor summary run offline on this device.
         </p>
       </section>
 

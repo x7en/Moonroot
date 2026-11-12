@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { APP_VERSION } from '../../app/store';
 import type {
+  BodyLog,
   DateKey,
   DayLog,
   Decision,
@@ -24,6 +25,7 @@ interface DoctorFileSheetProps {
   under18: boolean;
   profile: Profile | null;
   dayLogs: readonly DayLog[];
+  bodyLogs?: readonly BodyLog[];
   medicines: readonly MedicineEntry[];
   visits: readonly DoctorVisit[];
   decisions?: readonly Decision[];
@@ -31,6 +33,7 @@ interface DoctorFileSheetProps {
   watchItems?: readonly WatchItem[];
   forecasts?: readonly Forecast[];
   onDownload: (filename: string, content: string, mimeType: string) => void;
+  onDoctorFileCreated?: () => void;
   onClose: () => void;
 }
 
@@ -40,6 +43,7 @@ export function DoctorFileSheet({
   under18,
   profile,
   dayLogs,
+  bodyLogs = [],
   medicines,
   visits,
   decisions = [],
@@ -47,10 +51,12 @@ export function DoctorFileSheet({
   watchItems = [],
   forecasts = [],
   onDownload,
+  onDoctorFileCreated,
   onClose,
 }: DoctorFileSheetProps) {
   const [range, setRange] = useState<DoctorFileRange>('3m');
   const [format, setFormat] = useState<DoctorFileFormat>('md');
+  const [includeBody, setIncludeBody] = useState(true);
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeMedicines, setIncludeMedicines] = useState(true);
   const [includeVerdicts, setIncludeVerdicts] = useState(true);
@@ -64,6 +70,7 @@ export function DoctorFileSheet({
         appVersion: APP_VERSION,
         profile,
         dayLogs,
+        bodyLogs,
         medicines,
         visits,
         decisions,
@@ -73,6 +80,7 @@ export function DoctorFileSheet({
         options: {
           range,
           format,
+          includeBody,
           includeNotes,
           includeMedicines,
           includeVerdicts,
@@ -84,6 +92,7 @@ export function DoctorFileSheet({
       today,
       profile,
       dayLogs,
+      bodyLogs,
       medicines,
       visits,
       decisions,
@@ -92,6 +101,7 @@ export function DoctorFileSheet({
       forecasts,
       range,
       format,
+      includeBody,
       includeNotes,
       includeMedicines,
       includeVerdicts,
@@ -106,12 +116,14 @@ export function DoctorFileSheet({
       buildDayTableCsv({
         today,
         dayLogs,
+        bodyLogs,
         medicines,
         range,
+        includeBody,
         includeNotes,
         includeMedicines,
       }),
-    [today, dayLogs, medicines, range, includeNotes, includeMedicines],
+    [today, dayLogs, bodyLogs, medicines, range, includeBody, includeNotes, includeMedicines],
   );
 
   const cycleCsv = useMemo(
@@ -196,6 +208,14 @@ export function DoctorFileSheet({
             <button
               type="button"
               class="chip"
+              aria-pressed={includeBody}
+              onClick={() => setIncludeBody((v) => !v)}
+            >
+              Body log
+            </button>
+            <button
+              type="button"
+              class="chip"
               aria-pressed={includeNotes}
               onClick={() => setIncludeNotes((v) => !v)}
             >
@@ -251,13 +271,14 @@ export function DoctorFileSheet({
           type="button"
           class="btn btn-primary"
           style={{ width: '100%' }}
-          onClick={() =>
+          onClick={() => {
+            onDoctorFileCreated?.();
             onDownload(
               output.filename,
               output.content,
               format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8',
-            )
-          }
+            );
+          }}
         >
           Save {output.filename}
         </button>

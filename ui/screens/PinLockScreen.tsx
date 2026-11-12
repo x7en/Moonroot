@@ -1,10 +1,22 @@
 import { useState } from 'preact/hooks';
+import type { CompanionStage } from '../../core/model/types';
+import { Sprout } from '../companion/Sprout';
 
 interface PinLockScreenProps {
+  stage?: CompanionStage;
+  rings?: number;
+  sproutName?: string | null;
+  reducedMotion?: boolean;
   onUnlock: (pin: string) => Promise<boolean>;
 }
 
-export function PinLockScreen({ onUnlock }: PinLockScreenProps) {
+export function PinLockScreen({
+  stage = 0,
+  rings = 0,
+  sproutName = null,
+  reducedMotion = false,
+  onUnlock,
+}: PinLockScreenProps) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -27,13 +39,16 @@ export function PinLockScreen({ onUnlock }: PinLockScreenProps) {
   return (
     <main class="app-shell" style={{ justifyContent: 'center', paddingBottom: '24px' }}>
       <div class="card" style={{ textAlign: 'center' }}>
-        <img
-          src="./icons/moonroot-icon.svg"
-          alt="Moonroot"
-          width="64"
-          height="64"
-          style={{ borderRadius: '16px', marginBottom: '12px' }}
-        />
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+          <Sprout
+            stage={stage}
+            mood="calm"
+            rings={rings}
+            name={sproutName}
+            reducedMotion={reducedMotion}
+            size={96}
+          />
+        </div>
         <h1 class="brand-title" style={{ marginBottom: '8px' }}>
           Moonroot
         </h1>

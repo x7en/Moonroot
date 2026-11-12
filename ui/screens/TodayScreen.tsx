@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
-  computeStep3Snapshot,
+  computeStep5Snapshot,
   getWatchCheckLabel,
   makeEmptyDayLog,
   summarizeWatchItem,
 } from '../../app/store';
+import { pickTapMessage } from '../../core/companion/companion';
 import { groupMedicinesForDay } from '../../core/medicine/totals';
 import { DANGER_SIGN_CATALOGUE, SYMPTOM_CATALOGUE } from '../../core/model/catalogues';
 import { isAdultSexualHealthAllowed, mayContainOestrogen } from '../../core/model/dates';
 import type {
+  BodyLog,
   Clots,
+  CompanionState,
   DangerSign,
   DateKey,
   DayLog,
@@ -21,6 +24,8 @@ import type {
   PainSite,
   Profile,
   Protection,
+  SproutMood,
+  SproutReaction,
   Stamp,
   StandingFlagId,
   SymptomKey,
@@ -29,6 +34,7 @@ import type {
 } from '../../core/model/types';
 import { isAdolescentCycleBand } from '../../core/triage/engine';
 import { isNeutralPregnancyQuestionAllowed } from '../../core/triage/flowEngine';
+import { Sprout } from '../companion/Sprout';
 import { DangerSignSheet } from '../components/DangerSignSheet';
 import { FLOW_OPTIONS, FlowGlyph } from '../components/FlowGlyphs';
 import { MedicineSheet } from '../components/MedicineSheet';
@@ -41,12 +47,18 @@ interface TodayScreenProps {
   profile: Profile;
   dayLog: DayLog | null;
   dayLogs: readonly DayLog[];
+  bodyLogs?: readonly BodyLog[];
   decisions: readonly Decision[];
   forecasts?: readonly Forecast[];
   medicines: readonly MedicineEntry[];
   verdicts: readonly Verdict[];
   watchItems: readonly WatchItem[];
   visits: readonly DoctorVisit[];
+  companion?: CompanionState;
+  activeReaction?: SproutReaction | null;
+  activePetalBurst?: boolean;
+  activeStageUp?: boolean;
+  reducedMotion?: boolean;
   onChangeDate: (date: DateKey) => void;
   onSaveDayLog: (log: DayLog) => Promise<void>;
   onSaveDecision: (decision: Decision) => Promise<void>;
@@ -62,6 +74,7 @@ interface TodayScreenProps {
   ) => Promise<void>;
   onSaveMedicine: (entry: MedicineEntry) => Promise<void>;
   onSaveVisit: (visit: DoctorVisit) => Promise<void>;
+  onOpenWeeklyReview?: () => Promise<void>;
   onOpenGetHelp: () => void;
 }
 
@@ -74,6 +87,25 @@ const PAIN_SITES: readonly { key: PainSite; label: string }[] = [
   { key: 'shoulder-tip', label: 'Shoulder tip' },
   { key: 'other', label: 'Other' },
 ];
+
+function formatBbtDisplay(bbtC: number | undefined, unit: 'C' | 'F'): string {
+  if (bbtC === undefined) return '';
+  if (unit === 'F') {
+    return String(Number(((bbtC * 9) / 5 + 32).toFixed(1)));
+  }
+  return String(Number(bbtC.toFixed(2)));
+}
+
+function parseBbtToCelsius(raw: string, unit: 'C' | 'F'): number | null {
+  const num = Number(raw.trim());
+  if (!Number.isFinite(num)) return null;
+  if (unit === 'F') {
+    if (num < 93 || num > 108) return null;
+    return Number((((num - 32) * 5) / 9).toFixed(2));
+  }
+  if (num < 34 || num > 42) return null;
+  return Number(num.toFixed(2));
+}
 
 function verdictPresentation(level: string): {
   icon: string;
@@ -102,6 +134,13 @@ function verdictPresentation(level: string): {
   return { icon: '✓', cssClass: 'verdict-card verdict-green', label: 'Nothing flagged' };
 }
 
+function moodDisplayLabel(mood: SproutMood): string {
+  if (mood === 'bright') return 'Bright';
+  if (mood === 'welcome') return 'Welcome back';
+  if (mood === 'sleepy') return 'Resting quietly';
+  return 'Calm';
+}
+
 export function TodayScreen({
   today,
   selectedDate,
@@ -109,12 +148,24 @@ export function TodayScreen({
   profile,
   dayLog,
   dayLogs,
+  bodyLogs = [],
   decisions,
   forecasts = [],
   medicines,
   verdicts,
   watchItems,
   visits,
+  companion = {
+    rings: 0,
+    stage: 0,
+    unlocked: ['dusk', 'dawn', 'high-contrast'],
+    badges: [],
+    lastRingDate: null,
+  },
+  activeReaction = null,
+  activePetalBurst = false,
+  activeStageUp = false,
+  reducedMotion = false,
   onChangeDate,
   onSaveDayLog,
   onSaveDecision,
@@ -123,15 +174,21 @@ export function TodayScreen({
   onAnswerWatchItem,
   onSaveMedicine,
   onSaveVisit,
+  onOpenWeeklyReview,
   onOpenGetHelp,
 }: TodayScreenProps) {
   const [dangerOpen, setDangerOpen] = useState(false);
   const [medicineOpen, setMedicineOpen] = useState(false);
   const [catchUpHidden, setCatchUpHidden] = useState(false);
   const [hormonePromptLater, setHormonePromptLater] = useState(false);
+  const [sproutTapCount, setSproutTapCount] = useState(-1);
+  const [weeklyOpen, setWeeklyOpen] = useState(false);
 
   const current: DayLog = dayLog ?? makeEmptyDayLog(selectedDate, nowIso);
   const [noteDraft, setNoteDraft] = useState<string>(current.note);
+  const [bbtDraft, setBbtDraft] = useState<string>(() =>
+    formatBbtDisplay(current.fertility?.bbt, profile.units.temperature),
+  );
   const draftRef = useRef<DayLog | null>(null);
   const pendingWritesRef = useRef(0);
   const lastDateRef = useRef<DateKey>(selectedDate);
@@ -144,26 +201,21 @@ export function TodayScreen({
 
   useEffect(() => {
     setNoteDraft(dayLog?.note ?? '');
-  }, [selectedDate, dayLog?.note]);
+    setBbtDraft(formatBbtDisplay(dayLog?.fertility?.bbt, profile.units.temperature));
+  }, [selectedDate, dayLog?.note, dayLog?.fertility?.bbt, profile.units.temperature]);
 
-  const step2 = computeStep3Snapshot(
+  const step2 = computeStep5Snapshot(
     {
       profile,
       dayLogs: [...dayLogs],
-      bodyLogs: [],
+      bodyLogs: [...bodyLogs],
       decisions: [...decisions],
       forecasts: [...forecasts],
       verdicts: [...verdicts],
       watchItems: [...watchItems],
       visits: [...visits],
       medicines: [...medicines],
-      companion: {
-        rings: 0,
-        stage: 0,
-        unlocked: ['dusk', 'dawn', 'high-contrast'],
-        badges: [],
-        lastRingDate: null,
-      },
+      companion,
       meta: {
         lastExportAt: null,
         lastAutoBackupAt: null,
@@ -220,11 +272,14 @@ export function TodayScreen({
     current.discharge === 'odour' ||
     current.discharge === 'yellow-green';
 
-  function patchLog(patch: Partial<DayLog>): Promise<void> {
+  function patchLog(
+    updater: Partial<DayLog> | ((prev: DayLog) => Partial<DayLog>),
+  ): Promise<void> {
     const base =
       draftRef.current && draftRef.current.date === selectedDate
         ? draftRef.current
         : (dayLog ?? makeEmptyDayLog(selectedDate, nowIso));
+    const patch = typeof updater === 'function' ? updater(base) : updater;
     const next: DayLog = {
       ...base,
       ...patch,
@@ -340,7 +395,9 @@ export function TodayScreen({
             <span>Ready for today&apos;s check-in</span>
           </div>
           <p class="muted" style={{ marginBottom: 0 }}>
-            Tap Flow and Pain below (under 10 seconds) to see today&apos;s result.
+            {dayLogs.length === 0
+              ? 'Log your first period to start. Confidence starts at 10%.'
+              : 'Tap Flow and Pain below (under 10 seconds) to see today’s result.'}
           </p>
         </section>
       ) : (
@@ -385,6 +442,107 @@ export function TodayScreen({
               <button type="button" class="btn btn-danger-solid" onClick={onOpenGetHelp}>
                 Open Get help
               </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section class="card sprout-card" aria-label="Companion sprout">
+        <button
+          type="button"
+          class="sprout-tap-btn"
+          aria-label={
+            profile.sproutName
+              ? `Talk to ${profile.sproutName}`
+              : 'Talk to sprout'
+          }
+          onClick={() => setSproutTapCount((c) => c + 1)}
+        >
+          <Sprout
+            stage={companion.stage}
+            mood={step2.mood}
+            rings={companion.rings}
+            name={profile.sproutName}
+            reaction={companion.stage >= 1 ? activeReaction : null}
+            petalBurst={companion.stage >= 2 && activePetalBurst}
+            stageUp={activeStageUp}
+            reducedMotion={reducedMotion}
+            size={96}
+          />
+        </button>
+        <div>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.15rem' }}>
+            {profile.sproutName ? `${profile.sproutName} · ` : ''}
+            {step2.stageInfo.name}
+          </div>
+          <div class="muted tabular" style={{ marginTop: '2px' }}>
+            {moodDisplayLabel(step2.mood)} · {companion.rings} rings · {companion.badges.length} of 8
+            badges
+          </div>
+          {activeStageUp && (
+            <p role="status" style={{ margin: '4px 0 0 0', color: 'var(--lamp)', fontWeight: 700 }}>
+              Stage {companion.stage}: {step2.stageInfo.name}
+            </p>
+          )}
+          {sproutTapCount >= 0 && (
+            <p role="status" class="muted" style={{ margin: '4px 0 0 0' }}>
+              {pickTapMessage(sproutTapCount)}
+            </p>
+          )}
+        </div>
+      </section>
+
+      {step2.sundayEvening && (
+        <section class="card" aria-label="Sunday weekly review" style={{ borderColor: 'var(--lamp)' }}>
+          <div class="btn-row" style={{ justifyContent: 'space-between' }}>
+            <div>
+              <h2 class="card-title" style={{ marginBottom: '2px' }}>
+                Sunday weekly review
+              </h2>
+              <p class="muted" style={{ margin: 0 }}>
+                20-second wrap-up of your week.
+              </p>
+            </div>
+            {!weeklyOpen ? (
+              <button
+                type="button"
+                class="btn btn-lamp btn-small"
+                onClick={() => {
+                  setWeeklyOpen(true);
+                  void onOpenWeeklyReview?.();
+                }}
+              >
+                Open weekly review
+              </button>
+            ) : (
+              <button
+                type="button"
+                class="btn btn-small"
+                onClick={() => setWeeklyOpen(false)}
+              >
+                Hide review
+              </button>
+            )}
+          </div>
+          {weeklyOpen && (
+            <div style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+              <p class="tabular" style={{ margin: '0 0 6px 0' }}>
+                <strong>Days checked in this week:</strong> {step2.weeklyReview.daysCheckedInThisWeek}{' '}
+                of 7
+              </p>
+              <p style={{ margin: '0 0 6px 0' }}>
+                <strong>Pattern:</strong> {step2.weeklyReview.patternText}
+              </p>
+              <p class="tabular" style={{ margin: 0 }}>
+                <strong>Confidence:</strong> {step2.weeklyReview.confidenceScore}%
+                {step2.weeklyReview.confidenceDelta !== null
+                  ? step2.weeklyReview.confidenceDelta > 0
+                    ? ` (+${step2.weeklyReview.confidenceDelta} since last week)`
+                    : step2.weeklyReview.confidenceDelta < 0
+                      ? ` (${step2.weeklyReview.confidenceDelta} since last week)`
+                      : ' (steady since last week)'
+                  : ''}
+              </p>
             </div>
           )}
         </section>
@@ -1153,6 +1311,133 @@ export function TodayScreen({
             ))}
           </div>
         )}
+      </section>
+
+      <section class="card" aria-label="Ovulation signals">
+        <h2 class="card-title">Ovulation signals (optional)</h2>
+        <div class="field">
+          <label htmlFor="bbt-temp-input">
+            Morning temperature (°{profile.units.temperature})
+          </label>
+          <div class="btn-row">
+            <input
+              id="bbt-temp-input"
+              class="input tabular"
+              type="number"
+              step="0.1"
+              inputMode="decimal"
+              style={{ flex: '1 1 130px' }}
+              value={bbtDraft}
+              placeholder={profile.units.temperature === 'F' ? 'e.g. 97.6' : 'e.g. 36.45'}
+              onInput={(e) => {
+                const raw = (e.target as HTMLInputElement).value;
+                setBbtDraft(raw);
+                if (!raw.trim()) {
+                  void patchLog((prev) => {
+                    const rest = { ...prev.fertility };
+                    delete rest.bbt;
+                    return { fertility: Object.keys(rest).length > 0 ? rest : undefined };
+                  });
+                  return;
+                }
+                const cVal = parseBbtToCelsius(raw, profile.units.temperature);
+                if (cVal !== null) {
+                  void patchLog((prev) => ({
+                    fertility: { ...prev.fertility, bbt: cVal },
+                  }));
+                }
+              }}
+            />
+            <label htmlFor="bbt-time-input" class="sr-only">
+              Temperature time
+            </label>
+            <input
+              id="bbt-time-input"
+              class="input tabular"
+              type="time"
+              style={{ flex: '0 1 120px' }}
+              value={current.fertility?.bbtTime ?? ''}
+              onInput={(e) => {
+                const tVal = (e.target as HTMLInputElement).value;
+                void patchLog((prev) => {
+                  const nextFertility = { ...prev.fertility };
+                  if (tVal) {
+                    nextFertility.bbtTime = tVal;
+                  } else {
+                    delete nextFertility.bbtTime;
+                  }
+                  return {
+                    fertility: Object.keys(nextFertility).length > 0 ? nextFertility : undefined,
+                  };
+                });
+              }}
+            />
+          </div>
+          {profile.units.temperature === 'F' && current.fertility?.bbt !== undefined && (
+            <p class="muted tabular" style={{ margin: '4px 0 0 0' }}>
+              Stored internally as {current.fertility.bbt.toFixed(2)} °C.
+            </p>
+          )}
+        </div>
+
+        <div class="field">
+          <span class="field-label">LH strip</span>
+          <div class="chip-group">
+            {(['negative', 'faint', 'positive'] as const).map((lhVal) => (
+              <button
+                key={lhVal}
+                type="button"
+                class="chip"
+                aria-label={`LH ${lhVal}`}
+                aria-pressed={current.fertility?.lh === lhVal}
+                onClick={() => {
+                  void patchLog((prev) => {
+                    const nextFertility = { ...prev.fertility };
+                    if (nextFertility.lh === lhVal) {
+                      delete nextFertility.lh;
+                    } else {
+                      nextFertility.lh = lhVal;
+                    }
+                    return {
+                      fertility: Object.keys(nextFertility).length > 0 ? nextFertility : undefined,
+                    };
+                  });
+                }}
+              >
+                {lhVal}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div class="field" style={{ marginBottom: 0 }}>
+          <span class="field-label">Cervical mucus</span>
+          <div class="chip-group">
+            {(['dry', 'sticky', 'creamy', 'watery', 'egg-white'] as const).map((mucusVal) => (
+              <button
+                key={mucusVal}
+                type="button"
+                class="chip"
+                aria-pressed={current.fertility?.mucus === mucusVal}
+                onClick={() => {
+                  void patchLog((prev) => {
+                    const nextFertility = { ...prev.fertility };
+                    if (nextFertility.mucus === mucusVal) {
+                      delete nextFertility.mucus;
+                    } else {
+                      nextFertility.mucus = mucusVal;
+                    }
+                    return {
+                      fertility: Object.keys(nextFertility).length > 0 ? nextFertility : undefined,
+                    };
+                  });
+                }}
+              >
+                {mucusVal}
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section class="card" aria-label="Symptoms and notes">

@@ -49,9 +49,17 @@ Range: 2026-05-04 to 2026-10-30
 
 ## 6. Patterns the app found
 - Lead-in pattern: not enough consistent cycles yet (0 of 4 cycles with pre-flow spotting or cramps of 3 or more).
+- Lifestyle patterns (non-bleeding days only): none found yet (requires at least 14 non-bleeding days in each comparison group).
 
 ## 7. Flags raised
 - Verdict and event flags: none raised in this range.
+
+## 8. Body and lifestyle
+- Sleep (hours): none logged in last 90 days.
+- Water: none logged in last 90 days.
+- Stool type (Bristol 1-7): none logged in last 90 days.
+- Stress (1-5): none logged in last 90 days.
+- Exercise (minutes/day logged): none logged in last 90 days.
 
 ## 10. Tests, medicines and visits
 - Pregnancy tests: none logged in this range.
@@ -128,6 +136,8 @@ Range: 2026-05-04 to 2026-10-30
     "followedSignalEvents": 0,
     "offsetRangeDays": null
   },
+  "lifestylePatterns": [],
+  "ovulationSummary": null,
   "standingFlags": [],
   "openEventIds": [],
   "medicinesSummary": {
@@ -252,11 +262,19 @@ In her words: "I always cramp a week before flow starts."
 
 ## 6. Patterns the app found
 - Lead-in pattern (spotting or cramps of 3 or more before flow): seen in 4 of 4 cycle(s), typically 7 days before flow starts (likely offset 6 to 7 days; 4 of 4 signal events followed by flow within 14 days). This is a pattern in logged data, not proof of cause.
+- Lifestyle patterns (non-bleeding days only): none found yet (requires at least 14 non-bleeding days in each comparison group).
 
 ## 7. Flags raised
 - Verdict and event log:
   - 2026-10-18 [orange] ORG-05: Because 2 of your last 3 cycles were longer than the usual range for your age. — open.
   - 2026-10-30 [yellow] YEL-04: Because your latest cycle fell outside the typical range for your age. — active today.
+
+## 8. Body and lifestyle
+- Sleep (hours): none logged in last 90 days.
+- Water: none logged in last 90 days.
+- Stool type (Bristol 1-7): none logged in last 90 days.
+- Stress (1-5): none logged in last 90 days.
+- Exercise (minutes/day logged): none logged in last 90 days.
 
 ## 10. Tests, medicines and visits
 - Pregnancy tests: none logged in this range.
@@ -333,6 +351,8 @@ In her words: "I always cramp a week before flow starts."
       7
     ]
   },
+  "lifestylePatterns": [],
+  "ovulationSummary": null,
   "standingFlags": [],
   "openEventIds": [
     "ORG-05"
@@ -444,6 +464,7 @@ Range: 2026-05-04 to 2026-10-30
 6. Patterns the app found
 -------------------------
 - Lead-in pattern: not enough consistent cycles yet (0 of 4 cycles with pre-flow spotting or cramps of 3 or more).
+- Lifestyle patterns (non-bleeding days only): none found yet (requires at least 14 non-bleeding days in each comparison group).
 
 7. Flags raised
 ---------------
@@ -454,6 +475,14 @@ Range: 2026-05-04 to 2026-10-30
   - 2026-10-20 [orange] ORG-05: Because 2 of your last 3 cycles were longer than the usual range for your age. — open.
   - 2026-10-20 [orange] ORG-09: Because pain reached 7 or more, or stopped your normal activities, in 2 of your last 3 periods. — open.
   - 2026-10-30 [yellow] YEL-04: Because your latest cycle fell outside the typical range for your age. — active today.
+
+8. Body and lifestyle
+---------------------
+- Sleep (hours): none logged in last 90 days.
+- Water: none logged in last 90 days.
+- Stool type (Bristol 1-7): none logged in last 90 days.
+- Stress (1-5): none logged in last 90 days.
+- Exercise (minutes/day logged): none logged in last 90 days.
 
 10. Tests, medicines and visits
 -------------------------------
@@ -522,6 +551,8 @@ Machine-readable data
     "followedSignalEvents": 0,
     "offsetRangeDays": null
   },
+  "lifestylePatterns": [],
+  "ovulationSummary": null,
   "standingFlags": [
     {
       "ruleId": "STD-04",

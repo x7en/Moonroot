@@ -144,5 +144,31 @@
     "leadInRetired": "This pattern is not holding.",
     "noCyclesYet": "Log your first period to start.",
     "emptyHint": "Your ranges, confidence meter, and patterns unlock as you log periods."
+  },
+  "ovulation": {
+    "notContraceptionBanner": "This app is not a contraception method.",
+    "noSignals": "Not enough signals to estimate ovulation",
+    "waysToFindOut": "Ways to find out"
+  },
+  "body": {
+    "fastingToday": "Fasting today",
+    "fastingNote": "Fasting days stay out of water and meal patterns.",
+    "notProof": "This is a pattern, not proof of cause."
+  },
+  "companion": {
+    "moodBright": "Bright",
+    "moodCalm": "Calm",
+    "moodSleepy": "Resting quietly",
+    "moodWelcome": "Welcome back",
+    "weeklyReviewTitle": "Sunday weekly review",
+    "weeklyReviewOpen": "Open weekly review"
+  },
+  "ask": {
+    "title": "Ask your record",
+    "subtitle": "Tap one of the ten questions below. Every answer uses only your saved entries on this device."
+  },
+  "graphs": {
+    "title": "Graphs",
+    "buttonLabel": "Graphs"
   }
 }

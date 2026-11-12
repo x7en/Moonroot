@@ -2,21 +2,37 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   getRegionEmergencyInfo,
   makeDefaultProfile,
+  makeEmptyDayLog,
   MoonrootStore,
+  type CompanionUpdateOutcome,
 } from '../app/store';
+import { canUseTheme, deriveSproutMood } from '../core/companion/companion';
 import { isUnder18 } from '../core/model/dates';
 import type {
+  BodyLog,
   DateKey,
   DayLog,
   Decision,
   DoctorVisit,
   MedicineEntry,
   Profile,
+  SproutReaction,
   StandingFlagId,
 } from '../core/model/types';
-import { getLocalDateKey, getLocalStamp } from '../platform/web';
+import {
+  getLocalDateKey,
+  getLocalStamp,
+  playGentleChime,
+  prefersLightTheme,
+  prefersReducedMotion,
+  triggerHaptic,
+} from '../platform/web';
+import { registerCheckInDeepLink } from '../platform/native';
 import { DoctorFileSheet } from './components/DoctorFileSheet';
 import { GetHelpSheet } from './components/GetHelpSheet';
+import { AskScreen } from './screens/AskScreen';
+import { BodyScreen } from './screens/BodyScreen';
+import { GraphsScreen } from './screens/GraphsScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { PinLockScreen } from './screens/PinLockScreen';
 import { CycleScreen } from './screens/CycleScreen';
@@ -24,7 +40,11 @@ import { RecordScreen } from './screens/RecordScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { TodayScreen } from './screens/TodayScreen';
 
-type Tab = 'today' | 'cycle' | 'record' | 'settings';
+type Tab = 'today' | 'cycle' | 'record' | 'body' | 'settings';
+type SubView =
+  | { kind: 'graphs'; returnTab: 'cycle' | 'body' | 'record' }
+  | { kind: 'ask' }
+  | null;
 
 interface UndoState {
   date: DateKey;
@@ -36,11 +56,18 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   const [ready, setReady] = useState(false);
   const [tick, setTick] = useState(0);
   const [tab, setTab] = useState<Tab>('today');
+  const [subView, setSubView] = useState<SubView>(null);
   const [selectedDate, setSelectedDate] = useState<DateKey>(() => getLocalDateKey());
   const [getHelpOpen, setGetHelpOpen] = useState(false);
   const [doctorFileOpen, setDoctorFileOpen] = useState(false);
   const [undoState, setUndoState] = useState<UndoState | null>(null);
+  const [activeReaction, setActiveReaction] = useState<SproutReaction | null>(null);
+  const [activePetalBurst, setActivePetalBurst] = useState(false);
+  const [activeStageUp, setActiveStageUp] = useState(false);
   const undoTimerRef = useRef<number | null>(null);
+  const reactionTimerRef = useRef<number | null>(null);
+  const petalTimerRef = useRef<number | null>(null);
+  const stageUpTimerRef = useRef<number | null>(null);
 
   const today = getLocalDateKey();
   const nowIso = getLocalStamp();
@@ -48,6 +75,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
 
   useEffect(() => {
     let active = true;
+    let cleanupDeepLink: () => void = () => {};
     void store.init().then(async () => {
       if (store.snapshot.profile && !store.locked) {
         await store.syncTriageState();
@@ -57,18 +85,77 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         refresh();
       }
     });
+    void registerCheckInDeepLink(() => {
+      if (!active) return;
+      setSubView(null);
+      setTab('today');
+      setSelectedDate(getLocalDateKey());
+      refresh();
+    }).then((unsub) => {
+      if (active) {
+        cleanupDeepLink = unsub;
+      } else {
+        unsub();
+      }
+    });
     return () => {
       active = false;
+      cleanupDeepLink();
       if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);
+      if (reactionTimerRef.current !== null) window.clearTimeout(reactionTimerRef.current);
+      if (petalTimerRef.current !== null) window.clearTimeout(petalTimerRef.current);
+      if (stageUpTimerRef.current !== null) window.clearTimeout(stageUpTimerRef.current);
     };
   }, [store]);
 
   const profile = store.snapshot.profile;
-  const activeTheme = profile?.theme ?? 'dusk';
+  const reducedMotion = Boolean(profile?.reducedMotion) || prefersReducedMotion();
+  const hapticsEnabled = profile?.haptics !== false;
+  const soundEnabled = Boolean(profile?.sound);
+  const rawTheme = profile?.theme ?? 'dusk';
+  const resolvedTheme =
+    rawTheme === 'auto'
+      ? prefersLightTheme()
+        ? 'dawn'
+        : 'dusk'
+      : canUseTheme(rawTheme, store.snapshot.companion)
+        ? rawTheme
+        : 'dusk';
+  const nightGarden = store.snapshot.companion.stage >= 6;
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', activeTheme);
-  }, [activeTheme]);
+    document.documentElement.setAttribute('data-theme', resolvedTheme);
+    document.documentElement.setAttribute('data-reduced-motion', reducedMotion ? 'true' : 'false');
+    document.documentElement.setAttribute('data-night-garden', nightGarden ? 'true' : 'false');
+  }, [resolvedTheme, reducedMotion, nightGarden]);
+
+  function fireReaction(reaction: SproutReaction): void {
+    setActiveReaction(reaction);
+    if (reactionTimerRef.current !== null) window.clearTimeout(reactionTimerRef.current);
+    reactionTimerRef.current = window.setTimeout(() => {
+      setActiveReaction(null);
+    }, 850);
+  }
+
+  function applyCompanionOutcome(outcome: CompanionUpdateOutcome | null): void {
+    if (!outcome) return;
+    if (outcome.stageChanged) {
+      setActiveStageUp(true);
+      if (stageUpTimerRef.current !== null) window.clearTimeout(stageUpTimerRef.current);
+      stageUpTimerRef.current = window.setTimeout(() => {
+        setActiveStageUp(false);
+      }, 1200);
+      triggerHaptic('medium', hapticsEnabled, reducedMotion);
+      playGentleChime('stage-up', soundEnabled);
+    }
+    if (outcome.newlyEarnedBadges.length > 0 && outcome.newStage >= 2) {
+      setActivePetalBurst(true);
+      if (petalTimerRef.current !== null) window.clearTimeout(petalTimerRef.current);
+      petalTimerRef.current = window.setTimeout(() => {
+        setActivePetalBurst(false);
+      }, 850);
+    }
+  }
 
   if (!ready) {
     return (
@@ -83,6 +170,10 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   if (store.locked) {
     return (
       <PinLockScreen
+        stage={store.snapshot.companion.stage}
+        rings={store.snapshot.companion.rings}
+        sproutName={profile?.sproutName ?? null}
+        reducedMotion={reducedMotion}
         onUnlock={async (pin) => {
           const ok = await store.unlockWithPin(pin);
           if (ok) {
@@ -128,6 +219,13 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
 
   async function handleSaveDayLog(log: DayLog): Promise<void> {
     const prev = await store.saveDayLog(log);
+    triggerHaptic('light', hapticsEnabled, reducedMotion);
+    playGentleChime('checkin', soundEnabled);
+    const currentStage = store.lastCompanionEvent?.newStage ?? store.snapshot.companion.stage;
+    if (currentStage >= 1) {
+      fireReaction('other');
+    }
+    applyCompanionOutcome(store.lastCompanionEvent);
     refresh();
     setUndoState({ date: log.date, previous: prev });
     if (undoTimerRef.current !== null) window.clearTimeout(undoTimerRef.current);
@@ -149,6 +247,46 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
     refresh();
   }
 
+  async function handleSaveBodyLog(log: BodyLog): Promise<void> {
+    const prev = await store.saveBodyLog(log);
+    const waterChanged = JSON.stringify(prev?.water) !== JSON.stringify(log.water) && log.water;
+    const sleepChanged = JSON.stringify(prev?.sleep) !== JSON.stringify(log.sleep) && log.sleep;
+    const mealsChanged = JSON.stringify(prev?.meals) !== JSON.stringify(log.meals) && log.meals;
+    const reaction: SproutReaction = waterChanged
+      ? 'water'
+      : sleepChanged
+        ? 'sleep'
+        : mealsChanged
+          ? 'meal'
+          : 'other';
+    const currentStage = store.lastCompanionEvent?.newStage ?? store.snapshot.companion.stage;
+    if (currentStage >= 1) {
+      fireReaction(reaction);
+    }
+    applyCompanionOutcome(store.lastCompanionEvent);
+    refresh();
+  }
+
+  async function handleSaveStress(
+    date: DateKey,
+    stress: 1 | 2 | 3 | 4 | 5 | undefined,
+  ): Promise<void> {
+    const existing = store.getDayLog(date) ?? makeEmptyDayLog(date, nowIso);
+    const nextContext = { ...existing.context };
+    if (stress === undefined) {
+      delete nextContext.stress;
+    } else {
+      nextContext.stress = stress;
+    }
+    const nextLog: DayLog = {
+      ...existing,
+      context: Object.keys(nextContext).length > 0 ? nextContext : undefined,
+      updatedAt: nowIso,
+    };
+    await store.saveDayLog(nextLog);
+    refresh();
+  }
+
   return (
     <div class="app-shell" data-tick={tick}>
       <header class="top-bar">
@@ -157,11 +295,23 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           <button type="button" class="btn btn-help" onClick={() => setGetHelpOpen(true)}>
             Get help
           </button>
+          <button
+            type="button"
+            class="btn btn-small"
+            aria-current={tab === 'settings' && subView === null ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('settings');
+            }}
+          >
+            Settings
+          </button>
           {profile.lock.type === 'pin' && (
             <button
               type="button"
               class="btn btn-small"
               onClick={() => {
+                setSubView(null);
                 setTab('today');
                 store.locked = true;
                 refresh();
@@ -174,7 +324,55 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
       </header>
 
       <main>
-        {tab === 'today' && (
+        {subView?.kind === 'graphs' && (
+          <GraphsScreen
+            today={today}
+            nowIso={nowIso}
+            profile={profile}
+            dayLogs={store.snapshot.dayLogs}
+            bodyLogs={store.snapshot.bodyLogs}
+            decisions={store.snapshot.decisions}
+            forecasts={store.snapshot.forecasts}
+            medicines={store.snapshot.medicines}
+            verdicts={store.snapshot.verdicts}
+            watchItems={store.snapshot.watchItems}
+            visits={store.snapshot.visits}
+            meta={store.snapshot.meta}
+            returnLabel={
+              subView.returnTab === 'cycle'
+                ? 'Cycle'
+                : subView.returnTab === 'body'
+                  ? 'Body'
+                  : 'Record'
+            }
+            onBack={() => {
+              const target = subView.returnTab;
+              setSubView(null);
+              setTab(target);
+            }}
+          />
+        )}
+
+        {subView?.kind === 'ask' && (
+          <AskScreen
+            today={today}
+            nowIso={nowIso}
+            profile={profile}
+            dayLogs={store.snapshot.dayLogs}
+            bodyLogs={store.snapshot.bodyLogs}
+            decisions={store.snapshot.decisions}
+            forecasts={store.snapshot.forecasts}
+            medicines={store.snapshot.medicines}
+            verdicts={store.snapshot.verdicts}
+            meta={store.snapshot.meta}
+            onBack={() => {
+              setSubView(null);
+              setTab('record');
+            }}
+          />
+        )}
+
+        {subView === null && tab === 'today' && (
           <TodayScreen
             today={today}
             selectedDate={selectedDate}
@@ -182,16 +380,23 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             profile={profile}
             dayLog={store.getDayLog(selectedDate)}
             dayLogs={store.snapshot.dayLogs}
+            bodyLogs={store.snapshot.bodyLogs}
             decisions={store.snapshot.decisions}
             forecasts={store.snapshot.forecasts}
             medicines={store.snapshot.medicines}
             verdicts={store.snapshot.verdicts}
             watchItems={store.snapshot.watchItems}
             visits={store.snapshot.visits}
+            companion={store.snapshot.companion}
+            activeReaction={activeReaction}
+            activePetalBurst={activePetalBurst}
+            activeStageUp={activeStageUp}
+            reducedMotion={reducedMotion}
             onChangeDate={(date) => setSelectedDate(date)}
             onSaveDayLog={handleSaveDayLog}
             onSaveDecision={async (dec: Decision) => {
               await store.saveDecision(dec);
+              applyCompanionOutcome(store.lastCompanionEvent);
               refresh();
             }}
             onDismissEvent={async (verdictId) => {
@@ -208,6 +413,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             }}
             onAnswerWatchItem={async (watchId, answers) => {
               await store.answerWatchCheck(watchId, answers);
+              applyCompanionOutcome(store.lastCompanionEvent);
               refresh();
             }}
             onSaveMedicine={async (entry: MedicineEntry) => {
@@ -218,11 +424,16 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               await store.saveVisit(visit);
               refresh();
             }}
+            onOpenWeeklyReview={async () => {
+              const out = await store.openWeeklyReview(today, nowIso);
+              applyCompanionOutcome(out);
+              refresh();
+            }}
             onOpenGetHelp={() => setGetHelpOpen(true)}
           />
         )}
 
-        {tab === 'cycle' && (
+        {subView === null && tab === 'cycle' && (
           <CycleScreen
             today={today}
             nowIso={nowIso}
@@ -237,6 +448,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             meta={store.snapshot.meta}
             onEditDay={(date) => {
               setSelectedDate(date);
+              setSubView(null);
               setTab('today');
             }}
             onSaveApproximatePeriod={async (startDate, durationDays) => {
@@ -251,10 +463,11 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               await store.deleteDecision(id);
               refresh();
             }}
+            onOpenGraphs={() => setSubView({ kind: 'graphs', returnTab: 'cycle' })}
           />
         )}
 
-        {tab === 'record' && (
+        {subView === null && tab === 'record' && (
           <RecordScreen
             today={today}
             nowIso={nowIso}
@@ -266,12 +479,15 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             watchItems={store.snapshot.watchItems}
             visits={store.snapshot.visits}
             meta={store.snapshot.meta}
+            companion={store.snapshot.companion}
             onEditDay={(date) => {
               setSelectedDate(date);
+              setSubView(null);
               setTab('today');
             }}
             onSaveDecision={async (dec: Decision) => {
               await store.saveDecision(dec);
+              applyCompanionOutcome(store.lastCompanionEvent);
               refresh();
             }}
             onDeleteDecision={async (id) => {
@@ -290,25 +506,65 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               await store.dismissEventCard(verdictId);
               refresh();
             }}
-            onOpenDoctorFile={() => setDoctorFileOpen(true)}
-            onQuickExportBackup={() => setTab('settings')}
+            onOpenDoctorFile={() => {
+              void store.markDoctorFileCreated(today).then((out) => {
+                applyCompanionOutcome(out);
+                refresh();
+              });
+              setDoctorFileOpen(true);
+            }}
+            onQuickExportBackup={() => {
+              setSubView(null);
+              setTab('settings');
+            }}
             onSnoozeBackup={async () => {
               await store.snoozeBackupNudge();
               refresh();
             }}
+            onOpenGraphs={() => setSubView({ kind: 'graphs', returnTab: 'record' })}
+            onOpenAsk={() => setSubView({ kind: 'ask' })}
           />
         )}
 
-        {tab === 'settings' && (
+        {subView === null && tab === 'body' && (
+          <BodyScreen
+            today={today}
+            selectedDate={selectedDate}
+            nowIso={nowIso}
+            profile={profile}
+            dayLogs={store.snapshot.dayLogs}
+            bodyLogs={store.snapshot.bodyLogs}
+            companion={store.snapshot.companion}
+            mood={deriveSproutMood({
+              today,
+              dayLogs: store.snapshot.dayLogs,
+              companion: store.snapshot.companion,
+            })}
+            activeReaction={activeReaction}
+            reducedMotion={reducedMotion}
+            onChangeDate={(date) => setSelectedDate(date)}
+            onSaveBodyLog={handleSaveBodyLog}
+            onSaveStress={handleSaveStress}
+            onOpenGraphs={() => setSubView({ kind: 'graphs', returnTab: 'body' })}
+          />
+        )}
+
+        {subView === null && tab === 'settings' && (
           <SettingsScreen
             today={today}
             profile={profile}
+            companion={store.snapshot.companion}
+            reminderPlan={store.getReminderPlan(today)}
             onSaveProfile={handleSaveProfile}
             onSetPin={async (pin) => {
               await store.setPin(pin);
               refresh();
             }}
-            onExportBackup={(passphrase) => store.exportBackup(passphrase)}
+            onExportBackup={(passphrase) => store.exportBackup(passphrase).then((res) => {
+              applyCompanionOutcome(store.lastCompanionEvent);
+              refresh();
+              return res;
+            })}
             onInspectBackup={(raw) => store.inspectBackup(raw)}
             onRestoreBackup={async (raw, passphrase) => {
               await store.restoreBackup(raw, passphrase);
@@ -341,16 +597,22 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'today' ? 'page' : undefined}
-            onClick={() => setTab('today')}
+            aria-current={subView === null && tab === 'today' ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('today');
+            }}
           >
             Today
           </button>
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'cycle' ? 'page' : undefined}
-            onClick={() => setTab('cycle')}
+            aria-current={subView === null && tab === 'cycle' ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('cycle');
+            }}
           >
             Cycle
           </button>
@@ -360,6 +622,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             aria-label="Log today"
             onClick={() => {
               setSelectedDate(today);
+              setSubView(null);
               setTab('today');
             }}
           >
@@ -368,18 +631,24 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'record' ? 'page' : undefined}
-            onClick={() => setTab('record')}
+            aria-current={subView === null && tab === 'record' ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('record');
+            }}
           >
             Record
           </button>
           <button
             type="button"
             class="nav-tab"
-            aria-current={tab === 'settings' ? 'page' : undefined}
-            onClick={() => setTab('settings')}
+            aria-current={subView === null && tab === 'body' ? 'page' : undefined}
+            onClick={() => {
+              setSubView(null);
+              setTab('body');
+            }}
           >
-            Settings
+            Body
           </button>
         </div>
       </nav>
@@ -397,6 +666,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         under18={under18}
         profile={profile ?? makeDefaultProfile(nowIso)}
         dayLogs={store.snapshot.dayLogs}
+        bodyLogs={store.snapshot.bodyLogs}
         medicines={store.snapshot.medicines}
         visits={store.snapshot.visits}
         decisions={store.snapshot.decisions}
@@ -404,6 +674,12 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         watchItems={store.snapshot.watchItems}
         forecasts={store.snapshot.forecasts}
         onDownload={(filename, content, mime) => store.downloadFile(filename, content, mime)}
+        onDoctorFileCreated={() => {
+          void store.markDoctorFileCreated(today).then((out) => {
+            applyCompanionOutcome(out);
+            refresh();
+          });
+        }}
         onClose={() => setDoctorFileOpen(false)}
       />
     </div>

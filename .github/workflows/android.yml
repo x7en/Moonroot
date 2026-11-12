@@ -1,0 +1,77 @@
+name: Android Debug APK
+
+on:
+  push:
+    branches: [main, 'arena/**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run typecheck, lint, tests, and simulation
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run sim
+
+      - name: Build web bundle and sync Capacitor Android
+        run: |
+          npm run widget:art
+          npm run build
+          npx cap sync android
+
+      - name: Build signed debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug -PversionCode=${{ github.run_number }} --no-daemon
+
+      - name: Verify built AndroidManifest privacy hardening
+        run: npm run android:verify
+
+      - name: Prepare moonroot.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk moonroot.apk
+
+      - name: Upload moonroot-debug APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: moonroot-debug-apk
+          path: moonroot.apk
+
+      - name: Publish GitHub Release
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="android-build-${{ github.run_number }}"
+          gh release create "$TAG" moonroot.apk \
+            --title "Moonroot Android Build #${{ github.run_number }}" \
+            --notes "Personal-use debug APK signed with committed moonroot-debug.keystore so updates preserve app data. Not yet cleared for wider public distribution." \
+            --target "${{ github.sha }}" || \
+          gh release upload "$TAG" moonroot.apk --clobber

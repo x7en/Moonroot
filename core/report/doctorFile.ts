@@ -1,11 +1,13 @@
 import { deriveCycles } from '../cycles/cycles';
 import { classifyEpisodes } from '../cycles/episodes';
+import { analyzeLifestylePatterns } from '../insights/lifestyle';
 import { summarizeMedicinesForRange } from '../medicine/totals';
 import { SYMPTOM_CATALOGUE } from '../model/catalogues';
 import { addDays, diffDays, isUnder18, parseDateKey } from '../model/dates';
 import {
   RULESET_VERSION,
   SCHEMA_VERSION,
+  type BodyLog,
   type DateKey,
   type DayLog,
   type Decision,
@@ -17,6 +19,7 @@ import {
   type Verdict,
   type WatchItem,
 } from '../model/types';
+import { analyzeOvulation } from '../ovulation/ovulation';
 import { computeConfidence } from '../predict/confidence';
 import { analyzeLeadInPattern } from '../predict/leadIn';
 import { evaluateTriage } from '../triage/engine';
@@ -31,6 +34,7 @@ export interface DoctorFileOptions {
   includeMedicines: boolean;
   includeIntimacy: boolean;
   includeVerdicts?: boolean;
+  includeBody?: boolean;
   worryNote?: string;
 }
 
@@ -39,6 +43,7 @@ export interface DoctorFileInput {
   appVersion: string;
   profile: Profile | null;
   dayLogs: readonly DayLog[];
+  bodyLogs?: readonly BodyLog[];
   medicines: readonly MedicineEntry[];
   visits: readonly DoctorVisit[];
   decisions?: readonly Decision[];
@@ -118,11 +123,25 @@ function fallbackMinorProfile(today: DateKey): Profile {
   };
 }
 
+function meanOf(values: readonly number[], decimals = 1): number | null {
+  if (values.length === 0) return null;
+  const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+  return Number(avg.toFixed(decimals));
+}
+
+function formatTempForDoctor(tempC: number, unit: 'C' | 'F'): string {
+  if (unit === 'F') {
+    const tempF = Number(((tempC * 9) / 5 + 32).toFixed(1));
+    return `${tempF} °F (${tempC.toFixed(2)} °C)`;
+  }
+  return `${tempC.toFixed(2)} °C`;
+}
+
 /**
- * Step 3 doctor summary builder:
- * Generates Parts 1, 2, 3, 4, 5 (whole range + per period), 6 (lead-in pattern),
- * 7, 10, 11, 12, plain Daily log table (last 3 months), footer, and machine-readable JSON block.
- * Parts belonging to Step 4 (6 lifestyle patterns, 8, 9) are omitted until implemented.
+ * Step 4 doctor summary builder:
+ * Generates Parts 1–12 (including Part 6 lead-in + lifestyle, Part 8 body/lifestyle,
+ * and Part 9 ovulation signals when logged), plain Daily log table (last 3 months),
+ * footer, and machine-readable JSON block.
  */
 export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   const {
@@ -130,6 +149,7 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
     appVersion,
     profile,
     dayLogs,
+    bodyLogs = [],
     medicines,
     visits,
     decisions = [],
@@ -140,6 +160,7 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
   } = input;
   const format = options.format;
   const includeVerdicts = options.includeVerdicts !== false;
+  const includeBody = options.includeBody !== false;
   const under18 = profile ? isUnder18(profile, today) : true;
   const allowIntimacyExport = Boolean(options.includeIntimacy && !under18);
 
@@ -167,6 +188,16 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
     dayLogs: sortedLogs,
     cycles: cycleSummary,
     resolvedForecasts: forecasts,
+  });
+  const lifestyle = analyzeLifestylePatterns({
+    today,
+    dayLogs: sortedLogs,
+    bodyLogs,
+  });
+  const ovulation = analyzeOvulation({
+    today,
+    dayLogs: sortedLogs,
+    cycles: cycleSummary,
   });
   const confidenceSummary = computeConfidence({
     activeCycles: cycleSummary.recentValidCyclesAfterBaseline,
@@ -444,6 +475,16 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
       `- Lead-in pattern: not enough consistent cycles yet (${leadIn.cyclesWithSignal} of 4 cycles with pre-flow spotting or cramps of 3 or more).`,
     );
   }
+  if (lifestyle.patterns.length > 0) {
+    lines.push('- Lifestyle patterns (non-bleeding days only):');
+    for (const pat of lifestyle.patterns) {
+      lines.push(`  - ${pat.statement}`);
+    }
+  } else {
+    lines.push(
+      '- Lifestyle patterns (non-bleeding days only): none found yet (requires at least 14 non-bleeding days in each comparison group).',
+    );
+  }
   lines.push('');
 
   // Part 7. Flags raised (respects includeVerdicts toggle)
@@ -495,6 +536,111 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
       lines.push(...eventRows);
     } else {
       lines.push('- Verdict and event flags: none raised in this range.');
+    }
+    lines.push('');
+  }
+
+  // Part 8. Body and lifestyle (30-day and 90-day averages)
+  if (includeBody) {
+    lines.push(heading('8. Body and lifestyle', format, 2));
+    const from30 = addDays(today, -29);
+    const from90 = addDays(today, -89);
+    const body30 = bodyLogs.filter((b) => b.date >= from30 && b.date <= today);
+    const body90 = bodyLogs.filter((b) => b.date >= from90 && b.date <= today);
+    const logs30 = sortedLogs.filter((l) => l.date >= from30 && l.date <= today);
+    const logs90 = sortedLogs.filter((l) => l.date >= from90 && l.date <= today);
+
+    const sleep30 = body30.map((b) => b.sleep?.hours).filter((v): v is number => v !== undefined);
+    const sleep90 = body90.map((b) => b.sleep?.hours).filter((v): v is number => v !== undefined);
+    const water30 = body30.map((b) => b.water?.ml).filter((v): v is number => v !== undefined);
+    const water90 = body90.map((b) => b.water?.ml).filter((v): v is number => v !== undefined);
+    const stool30 = body30
+      .map((b) => b.stool?.bristol)
+      .filter((v): v is 1 | 2 | 3 | 4 | 5 | 6 | 7 => v !== undefined);
+    const stool90 = body90
+      .map((b) => b.stool?.bristol)
+      .filter((v): v is 1 | 2 | 3 | 4 | 5 | 6 | 7 => v !== undefined);
+    const stress30 = logs30
+      .map((l) => l.context?.stress)
+      .filter((v): v is 1 | 2 | 3 | 4 | 5 => v !== undefined);
+    const stress90 = logs90
+      .map((l) => l.context?.stress)
+      .filter((v): v is 1 | 2 | 3 | 4 | 5 => v !== undefined);
+    const ex30 = body30
+      .map((b) => b.exercise?.minutes)
+      .filter((v): v is number => v !== undefined);
+    const ex90 = body90
+      .map((b) => b.exercise?.minutes)
+      .filter((v): v is number => v !== undefined);
+
+    const formatPair = (
+      vals30: number[],
+      vals90: number[],
+      formatVal: (v: number) => string,
+    ): string => {
+      const a30 = meanOf(vals30);
+      const a90 = meanOf(vals90);
+      if (a30 === null && a90 === null) return 'none logged in last 90 days.';
+      const s30 = a30 !== null ? `${formatVal(a30)} (${vals30.length}d)` : 'none';
+      const s90 = a90 !== null ? `${formatVal(a90)} (${vals90.length}d)` : 'none';
+      return `30-day avg ${s30} · 90-day avg ${s90}.`;
+    };
+
+    const waterUnit = effectiveProfile.units.water;
+    const formatWater = (ml: number): string =>
+      waterUnit === 'glasses'
+        ? `${Number((ml / 250).toFixed(1))} glasses (${Math.round(ml)} ml)`
+        : `${Math.round(ml)} ml`;
+
+    lines.push(`- Sleep (hours): ${formatPair(sleep30, sleep90, (v) => `${v}h`)}`);
+    lines.push(`- Water: ${formatPair(water30, water90, formatWater)}`);
+    lines.push(`- Stool type (Bristol 1-7): ${formatPair(stool30, stool90, (v) => `${v}`)}`);
+    lines.push(`- Stress (1-5): ${formatPair(stress30, stress90, (v) => `${v}/5`)}`);
+    lines.push(`- Exercise (minutes/day logged): ${formatPair(ex30, ex90, (v) => `${Math.round(v)} min`)}`);
+    lines.push('');
+  }
+
+  // Part 9. Ovulation signals (only if logged)
+  if (ovulation.anySignalLogged) {
+    lines.push(heading('9. Ovulation signals', format, 2));
+    const tempUnit = effectiveProfile.units.temperature;
+    const shiftsDetected = [...ovulation.completedCycles, ovulation.current].filter(
+      (c) => c.bbtShift !== null,
+    );
+    if (shiftsDetected.length > 0) {
+      lines.push(
+        `- Temperature shifts (3-over-6): ${shiftsDetected.length} detected (${shiftsDetected.map((s) => `${s.bbtShift?.ovulationDate ?? ''} (${formatTempForDoctor(s.bbtShift?.thirdReadingC ?? 0, tempUnit)})`).join('; ')}).`,
+      );
+    } else if (ovulation.anyBbtLogged) {
+      lines.push('- Temperature shifts (3-over-6): none detected in logged temperatures.');
+    }
+
+    const allPosLh = [...ovulation.completedCycles, ovulation.current].reduce(
+      (sum, c) => sum + c.lhPositiveCount,
+      0,
+    );
+    if (ovulation.anyLhLogged) {
+      lines.push(`- LH strip results: ${allPosLh} positive result(s) logged.`);
+    }
+
+    lines.push(
+      `- Current cycle ovulation estimate: ${ovulation.current.status === 'none' ? ovulation.current.message : `${ovulation.current.status} around ${ovulation.current.ovulationDate} (${ovulation.current.message})`}`,
+    );
+
+    if (ovulation.lutealSummary !== null) {
+      lines.push(
+        `- Learned luteal length (${ovulation.lutealSummary.count} confirmed cycle(s)): median ${ovulation.lutealSummary.q50} days (10th to 90th percentile ${ovulation.lutealSummary.q10} to ${ovulation.lutealSummary.q90} days; lengths: ${ovulation.learnedLutealLengths.join(', ')} days).`,
+      );
+    } else if (ovulation.learnedLutealLengths.length === 1) {
+      lines.push(
+        `- Luteal length (1 confirmed cycle so far): ${ovulation.learnedLutealLengths[0]} days (needs 2 confirmed cycles to learn range).`,
+      );
+    }
+
+    if (ovulation.fortyPlusTempDaysNoShift) {
+      lines.push(
+        `- Clinician note: ${ovulation.bbtDaysWithoutShift} non-illness days of basal body temperature logging recorded with no 3-over-6 shift (observation in logged entries only).`,
+      );
     }
     lines.push('');
   }
@@ -575,6 +721,17 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
         'My cycle lengths or gaps vary. What could explain that, and would any blood tests (for example thyroid and hormone levels) or an ultrasound help?',
       );
     }
+  }
+  const hasAcneOrHairInRange = bodyLogs.some(
+    (b) =>
+      b.date >= fromDate &&
+      b.date <= today &&
+      ((b.skin?.acne ?? 0) >= 1 || (b.skin?.hair !== undefined && b.skin.hair !== 'none')),
+  );
+  if (firedRuleSet.has('STD-01') && hasAcneOrHairInRange) {
+    questionsToAsk.push(
+      'I also notice acne or hair changes. Should my hormone levels be checked?',
+    );
   }
   if (firedRuleSet.has('STD-04') || firedRuleSet.has('ORG-03')) {
     questionsToAsk.push(
@@ -821,6 +978,21 @@ export function buildDoctorFile(input: DoctorFileInput): DoctorFileOutput {
       followedSignalEvents: leadIn.followedSignalEvents,
       offsetRangeDays: leadIn.offsetRangeDays,
     },
+    lifestylePatterns: lifestyle.patterns.map((p) => ({
+      id: p.id,
+      groupACount: p.groupACount,
+      groupBCount: p.groupBCount,
+      lastSupportingDate: p.lastSupportingDate,
+      statement: p.statement,
+    })),
+    ovulationSummary: ovulation.anySignalLogged
+      ? {
+          currentStatus: ovulation.current.status,
+          currentOvulationDate: ovulation.current.ovulationDate,
+          learnedLutealLengths: ovulation.learnedLutealLengths,
+          fortyPlusTempDaysNoShift: ovulation.fortyPlusTempDaysNoShift,
+        }
+      : null,
     standingFlags: triage.standingFlags.map((s) => ({
       ruleId: s.ruleId,
       title: s.title,

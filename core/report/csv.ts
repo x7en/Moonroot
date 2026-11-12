@@ -22,6 +22,7 @@ export interface DayCsvInput {
   medicines: readonly MedicineEntry[];
   bodyLogs?: readonly BodyLog[];
   range?: DoctorFileRange;
+  includeBody?: boolean;
   includeNotes?: boolean;
   includeMedicines?: boolean;
 }
@@ -68,6 +69,7 @@ export function buildDayTableCsv(input: DayCsvInput): CsvExportOutput {
     medicines,
     bodyLogs = [],
     range = 'all',
+    includeBody = true,
     includeNotes = true,
     includeMedicines = true,
   } = input;
@@ -135,9 +137,9 @@ export function buildDayTableCsv(input: DayCsvInput): CsvExportOutput {
         log.pain ? log.pain.level : '',
         symptoms,
         log.mood ?? '',
-        body?.sleep?.hours ?? '',
-        body?.water?.ml ?? '',
-        body?.stool?.bristol ?? '',
+        includeBody ? body?.sleep?.hours ?? '' : '',
+        includeBody ? body?.water?.ml ?? '' : '',
+        includeBody ? body?.stool?.bristol ?? '' : '',
         log.fertility?.bbt ?? '',
         log.fertility?.lh ?? '',
         log.fertility?.mucus ?? '',

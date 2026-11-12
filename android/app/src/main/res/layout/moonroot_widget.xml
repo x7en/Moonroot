@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <View
+        android:id="@+id/widget_accent_bar"
+        android:layout_width="40dp"
+        android:layout_height="3dp"
+        android:layout_marginBottom="4dp"
+        android:background="#7ACBA5" />
+
+    <ImageView
+        android:id="@+id/widget_sprout_image"
+        android:layout_width="68dp"
+        android:layout_height="68dp"
+        android:contentDescription="@string/widget_label"
+        android:scaleType="fitCenter"
+        android:src="@drawable/sprout_stage_0" />
+
+    <Button
+        android:id="@+id/widget_check_in_btn"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/widget_btn_bg"
+        android:minHeight="36dp"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:text="@string/widget_check_in"
+        android:textAllCaps="false"
+        android:textColor="#0F1C16"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

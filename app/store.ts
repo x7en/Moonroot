@@ -1,21 +1,40 @@
+import {
+  awardCompanionRing,
+  buildWeeklyReviewSummary,
+  deriveSproutMood,
+  getStageDefinition,
+  isCheckInDayLog,
+  isPopulatedBodyLog,
+  isSundayEvening,
+  reconcileCompanionState,
+  type StageDefinition,
+  type WeeklyReviewSummary,
+} from '../core/companion/companion';
 import { deriveCycles } from '../core/cycles/cycles';
 import { classifyEpisodes } from '../core/cycles/episodes';
+import { analyzeLifestylePatterns, type LifestyleAnalysisResult } from '../core/insights/lifestyle';
 import { addDays, diffDays } from '../core/model/dates';
 import {
   RULESET_VERSION,
   SCHEMA_VERSION,
   type AppSnapshotData,
   type BackupMeta,
+  type BodyLog,
+  type CompanionStage,
+  type CompanionState,
   type DateKey,
   type DayLog,
   type Decision,
   type DoctorVisit,
   type MedicineEntry,
   type Profile,
+  type RingSource,
+  type SproutMood,
   type Stamp,
   type StandingFlagId,
   type Verdict,
 } from '../core/model/types';
+import { type OvulationAnalysisResult } from '../core/ovulation/ovulation';
 import {
   computeLivePrediction,
   reconcileForecasts,
@@ -40,7 +59,24 @@ import { createPinLock, verifyPin } from '../data/pin';
 
 export { createPinLock };
 import regionsData from '../data/regions.json';
-import { downloadTextFile, getLocalDateKey, getLocalStamp } from '../platform/web';
+import {
+  applyNativeReminderPlan,
+  clearDeliveredReminders,
+  getDeliveredReminderCount,
+  isNativeAndroid,
+  syncScreenPrivacy,
+  syncWidgetState,
+  writeAutoBackupToDocuments,
+} from '../platform/native';
+import { exportAppFile, getLocalDateKey, getLocalStamp, prefersLightTheme } from '../platform/web';
+import {
+  advanceReminderTracker,
+  computeReminderPlan,
+  defaultReminderTracker,
+  reconcileDeliveredReminders,
+  type ReminderPlan,
+  type ReminderTrackerState,
+} from './reminders';
 
 export const APP_VERSION = '0.2.0';
 
@@ -100,6 +136,9 @@ export function makeDefaultProfile(nowIso: Stamp = getLocalStamp()): Profile {
     locale: 'en',
     region: 'PK',
     disclaimerAcceptedAt: null,
+    reducedMotion: false,
+    haptics: true,
+    sound: false,
   };
 }
 
@@ -212,10 +251,150 @@ export function computeStep3Snapshot(
   };
 }
 
+export function computeStep4Snapshot(
+  snapshot: AppSnapshotData,
+  selectedDate: DateKey,
+  today: DateKey,
+  nowIso: Stamp,
+): ReturnType<typeof computeStep3Snapshot> & {
+  lifestyle: LifestyleAnalysisResult;
+  ovulation: OvulationAnalysisResult;
+} {
+  const step3 = computeStep3Snapshot(snapshot, selectedDate, today, nowIso);
+  const lifestyle = analyzeLifestylePatterns({
+    today,
+    dayLogs: snapshot.dayLogs,
+    bodyLogs: snapshot.bodyLogs,
+  });
+  return {
+    ...step3,
+    lifestyle,
+    ovulation: step3.prediction.ovulation,
+  };
+}
+
+export function computeStep5Snapshot(
+  snapshot: AppSnapshotData,
+  selectedDate: DateKey,
+  today: DateKey,
+  nowIso: Stamp,
+): ReturnType<typeof computeStep4Snapshot> & {
+  mood: SproutMood;
+  stageInfo: StageDefinition;
+  sundayEvening: boolean;
+  weeklyReview: WeeklyReviewSummary;
+} {
+  const step4 = computeStep4Snapshot(snapshot, selectedDate, today, nowIso);
+  const mood = deriveSproutMood({
+    today,
+    dayLogs: snapshot.dayLogs,
+    companion: snapshot.companion,
+  });
+  const stageInfo = getStageDefinition(snapshot.companion.stage);
+  const sundayEvening = isSundayEvening(today, nowIso);
+  const patternText =
+    step4.lifestyle.patterns[0]?.statement ??
+    (step4.prediction.leadIn.status === 'learned'
+      ? `Spotting or cramps appeared around ${step4.prediction.leadIn.medianOffsetDays} days before flow in ${step4.prediction.leadIn.cyclesWithSignal} cycles.`
+      : null);
+  const weeklyReview = buildWeeklyReviewSummary({
+    today,
+    dayLogs: snapshot.dayLogs,
+    companion: snapshot.companion,
+    confidenceScore: step4.prediction.confidence.score,
+    patternText,
+  });
+
+  return {
+    ...step4,
+    mood,
+    stageInfo,
+    sundayEvening,
+    weeklyReview,
+  };
+}
+
+export interface CompanionUpdateOutcome {
+  awarded: 0 | 1;
+  stageChanged: boolean;
+  newStage: CompanionStage;
+  newlyEarnedBadges: string[];
+  newlyUnlockedThemes: string[];
+}
+
+function hasNewFollowUpAnswer(prev: DayLog | null, next: DayLog): boolean {
+  if (next.dangerAnswered === true && prev?.dangerAnswered !== true) return true;
+  if (next.changeEvery !== undefined && prev?.changeEvery !== next.changeEvery) return true;
+  if (next.soakedPerHour !== undefined && prev?.soakedPerHour !== next.soakedPerHour) return true;
+  if (next.clots !== undefined && prev?.clots !== next.clots) return true;
+  if (next.pregnancyChance !== undefined && prev?.pregnancyChance !== next.pregnancyChance) return true;
+  if (next.stoolBlood !== undefined && prev?.stoolBlood !== next.stoolBlood) return true;
+  if (
+    next.pain &&
+    next.pain.sites.length > 0 &&
+    (prev?.pain?.sites.length ?? 0) === 0
+  ) {
+    return true;
+  }
+  if (next.pain?.reliefHelped !== undefined && prev?.pain?.reliefHelped !== next.pain.reliefHelped) {
+    return true;
+  }
+  return false;
+}
+
+const REMINDER_TRACKER_STORAGE_KEY = 'moonroot_reminder_tracker';
+
+function resolveWidgetAccent(theme: Profile['theme']): string {
+  const effective = theme === 'auto' || theme === 'system' ? (prefersLightTheme() ? 'dawn' : 'dusk') : theme;
+  switch (effective) {
+    case 'dawn':
+      return '#2A8C64';
+    case 'meadow':
+      return '#6EC4A8';
+    case 'ocean':
+      return '#6AAEDB';
+    case 'rose':
+      return '#D4889E';
+    case 'high-contrast':
+      return '#00E5A3';
+    case 'midnight':
+    case 'dusk':
+    default:
+      return '#7ACBA5';
+  }
+}
+
+function loadReminderTracker(): ReminderTrackerState {
+  try {
+    if (typeof localStorage === 'undefined') return defaultReminderTracker();
+    const raw = localStorage.getItem(REMINDER_TRACKER_STORAGE_KEY);
+    if (!raw) return defaultReminderTracker();
+    const parsed = JSON.parse(raw) as Partial<ReminderTrackerState>;
+    return {
+      ignoredStreak: typeof parsed.ignoredStreak === 'number' ? parsed.ignoredStreak : 0,
+      lastPromptDate: typeof parsed.lastPromptDate === 'string' ? parsed.lastPromptDate : null,
+      lastCheckInDate: typeof parsed.lastCheckInDate === 'string' ? parsed.lastCheckInDate : null,
+    };
+  } catch {
+    return defaultReminderTracker();
+  }
+}
+
+function saveReminderTracker(state: ReminderTrackerState): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(REMINDER_TRACKER_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage quota errors in restricted sandboxes
+  }
+}
+
 export class MoonrootStore {
   readonly storage: IndexedDBStorage;
   snapshot: AppSnapshotData;
   locked = false;
+  lastCompanionEvent: CompanionUpdateOutcome | null = null;
+  reminderTracker: ReminderTrackerState = loadReminderTracker();
 
   constructor(storage = new IndexedDBStorage()) {
     this.storage = storage;
@@ -243,8 +422,11 @@ export class MoonrootStore {
   async init(): Promise<void> {
     this.snapshot = await this.storage.exportAll();
     this.locked = this.snapshot.profile?.lock.type === 'pin';
+    await syncScreenPrivacy(this.snapshot.profile?.lock.type === 'pin');
     if (this.snapshot.profile && !this.locked) {
       await this.syncForecasts();
+      await this.syncCompanionState();
+      await this.syncNativeEnvironment();
     }
   }
 
@@ -258,6 +440,8 @@ export class MoonrootStore {
     if (ok) {
       this.locked = false;
       await this.syncForecasts();
+      await this.syncCompanionState();
+      await this.syncNativeEnvironment();
     }
     return ok;
   }
@@ -266,6 +450,8 @@ export class MoonrootStore {
     await this.storage.saveProfile(profile);
     this.snapshot = { ...this.snapshot, profile };
     await this.syncForecasts();
+    await syncScreenPrivacy(profile.lock.type === 'pin');
+    await this.syncNativeEnvironment();
   }
 
   async setPin(pin: string | null): Promise<void> {
@@ -276,6 +462,122 @@ export class MoonrootStore {
 
   getDayLog(date: DateKey): DayLog | null {
     return this.snapshot.dayLogs.find((d) => d.date === date) ?? null;
+  }
+
+  getBodyLog(date: DateKey): BodyLog | null {
+    return this.snapshot.bodyLogs.find((b) => b.date === date) ?? null;
+  }
+
+  private async updateCompanionInternal(
+    sources: readonly RingSource[],
+    actionDate: DateKey,
+    extra: { doctorFileCreated?: boolean } = {},
+  ): Promise<CompanionUpdateOutcome> {
+    const prev = this.snapshot.companion;
+    let working = prev;
+    let totalAwarded: 0 | 1 = 0;
+    let anyStageChanged = false;
+    const unlockedSet = new Set<string>();
+
+    for (const source of sources) {
+      const res = awardCompanionRing(working, source, actionDate);
+      working = res.next;
+      if (res.awarded === 1) totalAwarded = 1;
+      if (res.stageChanged) anyStageChanged = true;
+      for (const theme of res.newlyUnlockedThemes) {
+        unlockedSet.add(theme);
+      }
+    }
+
+    const episodes = classifyEpisodes(
+      this.snapshot.dayLogs,
+      this.snapshot.decisions,
+      actionDate,
+    );
+    const cycles = deriveCycles(episodes, this.snapshot.decisions, actionDate);
+    const lifestyle = analyzeLifestylePatterns({
+      today: actionDate,
+      dayLogs: this.snapshot.dayLogs,
+      bodyLogs: this.snapshot.bodyLogs,
+    });
+    const prediction = computeLivePrediction({
+      today: actionDate,
+      profile: this.snapshot.profile ?? makeDefaultProfile(),
+      cycles,
+      dayLogs: this.snapshot.dayLogs,
+      decisions: this.snapshot.decisions,
+      existingForecasts: this.snapshot.forecasts,
+    });
+
+    const reconciled = reconcileCompanionState({
+      companion: working,
+      today: actionDate,
+      dayLogs: this.snapshot.dayLogs,
+      bodyLogs: this.snapshot.bodyLogs,
+      completedCycleCount: cycles.cycles.length,
+      hasPattern: lifestyle.patterns.length > 0 || prediction.leadIn.status === 'learned',
+      meta: this.snapshot.meta,
+      doctorFileCreated: extra.doctorFileCreated ?? working.doctorFileCreated,
+    });
+
+    const newlyEarnedBadges = reconciled.badges.filter((b) => !prev.badges.includes(b));
+    if (JSON.stringify(reconciled) !== JSON.stringify(prev)) {
+      await this.storage.saveCompanion(reconciled);
+      this.snapshot = { ...this.snapshot, companion: reconciled };
+    }
+
+    const outcome: CompanionUpdateOutcome = {
+      awarded: totalAwarded,
+      stageChanged: anyStageChanged || reconciled.stage > prev.stage,
+      newStage: reconciled.stage,
+      newlyEarnedBadges,
+      newlyUnlockedThemes: [...unlockedSet],
+    };
+    this.lastCompanionEvent = outcome;
+    return outcome;
+  }
+
+  async syncCompanionState(today: DateKey = getLocalDateKey()): Promise<CompanionUpdateOutcome> {
+    return this.updateCompanionInternal([], today);
+  }
+
+  async markDoctorFileCreated(today: DateKey = getLocalDateKey()): Promise<CompanionUpdateOutcome> {
+    return this.updateCompanionInternal([], today, { doctorFileCreated: true });
+  }
+
+  async openWeeklyReview(
+    today: DateKey = getLocalDateKey(),
+    nowIso: Stamp = getLocalStamp(),
+  ): Promise<CompanionUpdateOutcome> {
+    const step4 = computeStep4Snapshot(this.snapshot, today, today, nowIso);
+    const confidenceScore = step4.prediction.confidence.score;
+    const outcome = await this.updateCompanionInternal(['weekly-review'], today);
+    const nextComp: CompanionState = {
+      ...this.snapshot.companion,
+      lastWeeklyReviewDate: today,
+      lastWeeklyConfidence: confidenceScore,
+    };
+    if (JSON.stringify(nextComp) !== JSON.stringify(this.snapshot.companion)) {
+      await this.storage.saveCompanion(nextComp);
+      this.snapshot = { ...this.snapshot, companion: nextComp };
+    }
+    return outcome;
+  }
+
+  async saveBodyLog(log: BodyLog, actionToday: DateKey = getLocalDateKey()): Promise<BodyLog | null> {
+    const previous = this.getBodyLog(log.date);
+    await this.storage.saveBodyLog(log);
+    const others = this.snapshot.bodyLogs.filter((b) => b.date !== log.date);
+    this.snapshot = {
+      ...this.snapshot,
+      bodyLogs: [...others, log].sort((a, b) => a.date.localeCompare(b.date)),
+    };
+    if (isPopulatedBodyLog(log)) {
+      await this.updateCompanionInternal(['body'], actionToday);
+    } else {
+      await this.syncCompanionState(actionToday);
+    }
+    return previous;
   }
 
   async syncTriageState(
@@ -448,11 +750,12 @@ export class MoonrootStore {
       };
       await this.syncTriageState(getLocalDateKey(), nowIso);
       await this.syncForecasts(getLocalDateKey());
+      await this.syncCompanionState(getLocalDateKey());
     }
     return added;
   }
 
-  async saveDayLog(log: DayLog): Promise<DayLog | null> {
+  async saveDayLog(log: DayLog, actionToday: DateKey = getLocalDateKey()): Promise<DayLog | null> {
     const previous = this.getDayLog(log.date);
     await this.storage.saveDayLog(log);
     const others = this.snapshot.dayLogs.filter((d) => d.date !== log.date);
@@ -460,8 +763,25 @@ export class MoonrootStore {
       ...this.snapshot,
       dayLogs: [...others, log].sort((a, b) => a.date.localeCompare(b.date)),
     };
-    await this.syncTriageState(getLocalDateKey(), log.updatedAt);
-    await this.syncForecasts(getLocalDateKey());
+    await this.syncTriageState(actionToday, log.updatedAt);
+    await this.syncForecasts(actionToday);
+    const sources: RingSource[] = [];
+    if (isCheckInDayLog(log)) {
+      sources.push('checkin');
+    }
+    if (log.filledFrom !== 'approximate' && hasNewFollowUpAnswer(previous, log)) {
+      sources.push('followup');
+    }
+    await this.updateCompanionInternal(sources, actionToday);
+    if (isCheckInDayLog(log)) {
+      this.reminderTracker = advanceReminderTracker(this.reminderTracker, actionToday, {
+        hasCheckInToday: true,
+        reminderEnabled: Boolean(this.snapshot.profile?.reminders.daily.on),
+      });
+      saveReminderTracker(this.reminderTracker);
+      await clearDeliveredReminders();
+    }
+    await this.syncNativeEnvironment(actionToday);
     return previous;
   }
 
@@ -498,6 +818,7 @@ export class MoonrootStore {
     };
     await this.syncTriageState(getLocalDateKey(), decision.at);
     await this.syncForecasts(getLocalDateKey());
+    await this.syncCompanionState(getLocalDateKey());
   }
 
   async deleteDecision(id: string): Promise<void> {
@@ -564,6 +885,7 @@ export class MoonrootStore {
       ),
     };
     await this.syncTriageState(getLocalDateKey(), nowIso);
+    await this.updateCompanionInternal(['followup'], getLocalDateKey());
   }
 
   async saveMedicine(entry: MedicineEntry): Promise<void> {
@@ -611,6 +933,7 @@ export class MoonrootStore {
     };
     await this.storage.saveMeta(nextMeta);
     this.snapshot = { ...current, meta: nextMeta };
+    await this.syncCompanionState(today);
     return { filename: `moonroot-backup-${today}.json`, json };
   }
 
@@ -628,6 +951,76 @@ export class MoonrootStore {
     return inspectBackupFile(rawText);
   }
 
+  getReminderPlan(today: DateKey = getLocalDateKey()): ReminderPlan {
+    const profile = this.snapshot.profile ?? makeDefaultProfile();
+    const hasOpenWatchItem = this.snapshot.watchItems.some((w) => w.status === 'open');
+    return computeReminderPlan({
+      today,
+      profile,
+      hasOpenWatchItem,
+      tracker: this.reminderTracker,
+    });
+  }
+
+  async syncNativeEnvironment(today: DateKey = getLocalDateKey()): Promise<void> {
+    const profile = this.snapshot.profile;
+    await syncScreenPrivacy(profile?.lock.type === 'pin');
+    if (!profile || this.locked) return;
+
+    const mood = deriveSproutMood({
+      today,
+      dayLogs: this.snapshot.dayLogs,
+      companion: this.snapshot.companion,
+    });
+    await syncWidgetState({
+      stage: this.snapshot.companion.stage,
+      mood,
+      accent: resolveWidgetAccent(profile.theme),
+      discreetMode: profile.discreetMode,
+    });
+
+    const hasCheckInToday = this.snapshot.dayLogs.some(
+      (d) => d.date === today && isCheckInDayLog(d),
+    );
+    const hasOpenWatchItem = this.snapshot.watchItems.some((w) => w.status === 'open');
+    const delivered = await getDeliveredReminderCount();
+    let tracker = advanceReminderTracker(this.reminderTracker, today, {
+      hasCheckInToday,
+      reminderEnabled: profile.reminders.daily.on,
+    });
+    if (!hasCheckInToday) {
+      tracker = reconcileDeliveredReminders(tracker, delivered);
+    }
+    this.reminderTracker = tracker;
+    saveReminderTracker(tracker);
+
+    const plan = computeReminderPlan({
+      today,
+      profile,
+      hasOpenWatchItem,
+      tracker,
+    });
+    await applyNativeReminderPlan(plan);
+
+    if (isNativeAndroid() && this.snapshot.dayLogs.length > 0) {
+      const lastAuto = this.snapshot.meta.lastAutoBackupAt;
+      const stale = !lastAuto || diffDays(lastAuto.slice(0, 10), today) >= 7;
+      if (stale) {
+        const nowIso = getLocalStamp();
+        const json = await createBackupFile(this.snapshot, {
+          appVersion: APP_VERSION,
+          exportedAt: nowIso,
+        });
+        const written = await writeAutoBackupToDocuments(today, json, 4);
+        if (written) {
+          const nextMeta: BackupMeta = { ...this.snapshot.meta, lastAutoBackupAt: nowIso };
+          await this.storage.saveMeta(nextMeta);
+          this.snapshot = { ...this.snapshot, meta: nextMeta };
+        }
+      }
+    }
+  }
+
   async restoreBackup(rawText: string, passphrase?: string): Promise<AppSnapshotData> {
     const restored = await restoreBackupFile(rawText, {
       storage: this.storage,
@@ -638,6 +1031,8 @@ export class MoonrootStore {
     this.locked = false;
     await this.syncTriageState();
     await this.syncForecasts();
+    await this.syncCompanionState();
+    await this.syncNativeEnvironment();
     return restored;
   }
 
@@ -645,9 +1040,19 @@ export class MoonrootStore {
     await this.storage.clearAll();
     this.snapshot = await this.storage.exportAll();
     this.locked = false;
+    this.reminderTracker = defaultReminderTracker();
+    saveReminderTracker(this.reminderTracker);
+    await syncScreenPrivacy(false);
+    await applyNativeReminderPlan({
+      cadence: 'none',
+      adjustedForQuietHours: false,
+      effectiveTime: '20:00',
+      droppedToWeekly: false,
+      notifications: [],
+    });
   }
 
   downloadFile(filename: string, content: string, mimeType?: string): void {
-    downloadTextFile(filename, content, mimeType);
+    void exportAppFile(filename, content, mimeType);
   }
 }

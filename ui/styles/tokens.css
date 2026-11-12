@@ -21,6 +21,10 @@
   --shadow: none;
   --font-display: 'Fraunces', Georgia, serif;
   --font-body: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif;
+  --dur-fast: 120ms;
+  --dur-mid: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
 }
 
 [data-theme='dawn'] {
@@ -66,5 +70,97 @@
   --level-yellow: #ffe074;
   --level-orange: #ffac6e;
   --level-red: #ff7a7a;
+  --shadow: none;
+}
+
+[data-theme='meadow'] {
+  --bg: #0f1b17;
+  --surface: #172822;
+  --surface-2: #20372f;
+  --border: rgba(234, 245, 239, 0.16);
+  --text: #eaf5ef;
+  --text-muted: #a4c0b3;
+  --accent: #87d8a8;
+  --accent-text: #0d1d14;
+  --lamp: #f2c46d;
+  --lamp-text: #1f1606;
+  --flow: #eb7b89;
+  --spotting: #f4abb3;
+  --sleep: #9aa1f5;
+  --water: #64bedf;
+  --gut: #cfa472;
+  --level-green: #67d19b;
+  --level-yellow: #f2cc63;
+  --level-orange: #f59856;
+  --level-red: #f26b6b;
+  --shadow: none;
+}
+
+[data-theme='ocean'] {
+  --bg: #0d1722;
+  --surface: #142333;
+  --surface-2: #1d3147;
+  --border: rgba(232, 242, 251, 0.16);
+  --text: #e8f2fb;
+  --text-muted: #9eb9d0;
+  --accent: #6dd1c6;
+  --accent-text: #0a1b1a;
+  --lamp: #f4be6a;
+  --lamp-text: #1e1405;
+  --flow: #eb7a8a;
+  --spotting: #f5a9b4;
+  --sleep: #98a4f7;
+  --water: #70cbf2;
+  --gut: #cfa370;
+  --level-green: #5fd1a0;
+  --level-yellow: #f4cb60;
+  --level-orange: #f79652;
+  --level-red: #f26868;
+  --shadow: none;
+}
+
+[data-theme='rose'] {
+  --bg: #1c131d;
+  --surface: #281c29;
+  --surface-2: #362638;
+  --border: rgba(247, 236, 245, 0.16);
+  --text: #f7ecf5;
+  --text-muted: #c7aec4;
+  --accent: #e89ab8;
+  --accent-text: #240d18;
+  --lamp: #f3c272;
+  --lamp-text: #201406;
+  --flow: #f28496;
+  --spotting: #f7b1bd;
+  --sleep: #a7acf9;
+  --water: #6fc3e8;
+  --gut: #d6a979;
+  --level-green: #68cf9e;
+  --level-yellow: #f4cc66;
+  --level-orange: #f79959;
+  --level-red: #f47171;
+  --shadow: none;
+}
+
+[data-theme='midnight'] {
+  --bg: #000000;
+  --surface: #0c101a;
+  --surface-2: #171e30;
+  --border: rgba(237, 242, 252, 0.2);
+  --text: #edf2fc;
+  --text-muted: #a7b3cc;
+  --accent: #84d9b2;
+  --accent-text: #091711;
+  --lamp: #f5c273;
+  --lamp-text: #1b1306;
+  --flow: #ed7887;
+  --spotting: #f5a8b0;
+  --sleep: #989ff7;
+  --water: #68bfe6;
+  --gut: #cca172;
+  --level-green: #5ed19b;
+  --level-yellow: #f5ce66;
+  --level-orange: #f79654;
+  --level-red: #f26666;
   --shadow: none;
 }
