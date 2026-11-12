@@ -493,3 +493,21 @@ describe('Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tab
     expect(noBodyCsv.content).not.toContain(',2000,');
   });
 });
+
+describe('CSV formula injection protection', () => {
+  for (const prefix of ['=', '+', '-', '@', '\t', '\r']) {
+    it(`prefixes note values beginning with ${JSON.stringify(prefix)}`, () => {
+      const today = '2026-10-30';
+      const dangerousNote = `${prefix}1+1`;
+      const csv = buildDayTableCsv({
+        today,
+        dayLogs: [day(today, { note: dangerousNote })],
+        medicines: [],
+        includeBody: false,
+        includeMedicines: false,
+      });
+
+      expect(csv.content).toContain(`'${dangerousNote}`);
+    });
+  }
+});

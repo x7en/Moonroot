@@ -396,10 +396,10 @@ describe('Step 7 Capacitor native bridge & Android project checks', () => {
     expect(manifest).toContain('.widget.MoonrootWidgetProvider');
 
     const workflow = readFileSync(resolve(root, '.github/workflows/android.yml'), 'utf8');
-    expect(workflow).toContain('actions/checkout@v7');
-    expect(workflow).toContain('actions/setup-node@v7');
-    expect(workflow).toContain('actions/setup-java@v6');
-    expect(workflow).toContain('actions/upload-artifact@v7');
+    expect(workflow).toContain('actions/checkout@v4');
+    expect(workflow).toContain('actions/setup-node@v4');
+    expect(workflow).toContain('actions/setup-java@v4');
+    expect(workflow).toContain('actions/upload-artifact@v4');
     expect(workflow).toContain('-PversionCode=${{ github.run_number }}');
     expect(workflow).toContain('moonroot.apk');
   });

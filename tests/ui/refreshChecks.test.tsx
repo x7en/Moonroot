@@ -107,6 +107,24 @@ describe('UI refresh navigation, Butter/Night defaults, single-h1, error recover
     expect(consoleErrors).toEqual([]);
   });
 
+  it('prioritizes the PIN lock over unknown-route UI', async () => {
+    window.history.replaceState(null, '', '/unknown-page');
+    const store = await makeFreshStore();
+    const nowIso = getLocalStamp();
+    await store.storage.saveProfile({
+      ...makeDefaultProfile(nowIso),
+      birthYear: 1995,
+      menarcheAge: 13,
+      disclaimerAcceptedAt: nowIso,
+      lock: { type: 'pin', hash: 'test-hash', salt: 'test-salt' },
+    });
+
+    render(<App initialStore={store} />);
+    await screen.findByText('Enter your PIN to open.');
+    expect(screen.queryByRole('heading', { level: 1, name: 'Page not found' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Get help' })).toBeNull();
+  });
+
   it('isolates verdict cards from Citron .card and displays dismissible alert banner on save errors', async () => {
     const store = await makeFreshStore();
     const nowIso = getLocalStamp();

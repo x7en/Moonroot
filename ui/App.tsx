@@ -237,6 +237,25 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
     );
   }
 
+  if (store.locked) {
+    return (
+      <PinLockScreen
+        stage={store.snapshot.companion.stage}
+        rings={store.snapshot.companion.rings}
+        sproutName={profile?.sproutName ?? null}
+        reducedMotion={reducedMotion}
+        onUnlock={async (pin) => {
+          const ok = await store.unlockWithPin(pin);
+          if (ok) {
+            await store.syncTriageState();
+          }
+          refresh();
+          return ok;
+        }}
+      />
+    );
+  }
+
   if (notFound) {
     return (
       <div class="app-shell">
@@ -265,25 +284,6 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           onClose={() => setGetHelpOpen(false)}
         />
       </div>
-    );
-  }
-
-  if (store.locked) {
-    return (
-      <PinLockScreen
-        stage={store.snapshot.companion.stage}
-        rings={store.snapshot.companion.rings}
-        sproutName={profile?.sproutName ?? null}
-        reducedMotion={reducedMotion}
-        onUnlock={async (pin) => {
-          const ok = await store.unlockWithPin(pin);
-          if (ok) {
-            await store.syncTriageState();
-          }
-          refresh();
-          return ok;
-        }}
-      />
     );
   }
 
