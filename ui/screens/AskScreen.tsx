@@ -57,14 +57,14 @@ export function AskScreen({
 
   return (
     <div>
-      <section class="card" aria-label="Ask your record header">
+      <section aria-label="Ask your record header" style={{ marginBottom: '18px' }}>
         <div class="btn-row" style={{ justifyContent: 'space-between' }}>
           <div>
-            <h2 class="card-title" style={{ marginBottom: '2px' }}>
+            <h1 class="screen-title" style={{ marginBottom: '4px' }}>
               Ask your record
-            </h2>
+            </h1>
             <p class="muted" style={{ margin: 0 }}>
-              Tap one of the ten questions below. Every answer uses only your saved entries on this
+              Tap one of the ten questions below. Answers use only your saved entries on this
               device.
             </p>
           </div>
@@ -75,7 +75,7 @@ export function AskScreen({
       </section>
 
       <section class="card" aria-label="Questions list">
-        <h3 class="card-title">Questions</h3>
+        <h2 class="card-title">Questions</h2>
         <div class="ask-list">
           {ASK_QUESTIONS.map((item, idx) => (
             <button
@@ -95,7 +95,7 @@ export function AskScreen({
       </section>
 
       <section class="card ask-answer-card" aria-label="Answer" aria-live="polite">
-        <h3 class="card-title">{answer.question}</h3>
+        <h2 class="card-title">{answer.question}</h2>
         <span class="ask-date-range tabular">Date range: {answer.dateRange}</span>
         <p style={{ margin: '0 0 8px 0', fontWeight: 700 }}>{answer.summary}</p>
         {answer.details.length > 0 && (

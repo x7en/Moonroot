@@ -336,7 +336,7 @@ describe('Step 6 Visual polish, Graphs, Ask your record, Empty states, and Acces
     for (const theme of ['dusk', 'dawn', 'high-contrast'] as const) {
       fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
       const themeLabel =
-        theme === 'dusk' ? 'Dusk (night)' : theme === 'dawn' ? 'Dawn (day)' : 'High contrast';
+        theme === 'dusk' ? 'Night' : theme === 'dawn' ? 'Butter (light)' : 'High contrast';
       fireEvent.click(await screen.findByRole('button', { name: themeLabel }));
       await waitFor(() => expect(document.documentElement.getAttribute('data-theme')).toBe(theme));
       await runAxeNoSeriousOrCritical(container);
@@ -372,7 +372,7 @@ describe('Step 6 Visual polish, Graphs, Ask your record, Empty states, and Acces
     expect(tokensCss).toContain('--dur-slow: 320ms');
     expect(tokensCss).toContain('--ease-out: cubic-bezier(0, 0, 0.2, 1)');
     expect(baseCss).toContain('min-height: 48px');
-    expect(baseCss).toContain('outline: 2px solid var(--lamp)');
+    expect(baseCss).toContain('outline: 2px solid var(--accent)');
     expect(baseCss).toContain('sproutReducedStageUp 200ms ease-out 1');
     expect(baseCss).toContain('overflow-x: hidden');
     expect(baseCss).toContain('overflow-wrap: anywhere');

@@ -62,6 +62,7 @@ export function DoctorFileSheet({
   const [includeVerdicts, setIncludeVerdicts] = useState(true);
   const [includeIntimacy, setIncludeIntimacy] = useState(false);
   const [worryNote, setWorryNote] = useState('');
+  const [exportStatus, setExportStatus] = useState('');
 
   const output = useMemo(
     () =>
@@ -264,7 +265,9 @@ export function DoctorFileSheet({
 
         <div class="field">
           <span class="field-label">Preview ({output.filename})</span>
-          <pre class="pre-preview">{output.content}</pre>
+          <div class="pre-preview" role="region" aria-label="Doctor file preview">
+            {output.content}
+          </div>
         </div>
 
         <button
@@ -278,6 +281,7 @@ export function DoctorFileSheet({
               output.content,
               format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8',
             );
+            setExportStatus(`Saved ${output.filename}.`);
           }}
         >
           Save {output.filename}
@@ -288,7 +292,10 @@ export function DoctorFileSheet({
             type="button"
             class="btn btn-small"
             style={{ flex: '1 1 160px' }}
-            onClick={() => onDownload(dayCsv.filename, dayCsv.content, 'text/csv;charset=utf-8')}
+            onClick={() => {
+              onDownload(dayCsv.filename, dayCsv.content, 'text/csv;charset=utf-8');
+              setExportStatus(`Saved ${dayCsv.filename}.`);
+            }}
           >
             Download Day table (.csv)
           </button>
@@ -296,13 +303,20 @@ export function DoctorFileSheet({
             type="button"
             class="btn btn-small"
             style={{ flex: '1 1 160px' }}
-            onClick={() =>
-              onDownload(cycleCsv.filename, cycleCsv.content, 'text/csv;charset=utf-8')
-            }
+            onClick={() => {
+              onDownload(cycleCsv.filename, cycleCsv.content, 'text/csv;charset=utf-8');
+              setExportStatus(`Saved ${cycleCsv.filename}.`);
+            }}
           >
             Download Cycle table (.csv)
           </button>
         </div>
+
+        {exportStatus && (
+          <p role="status" class="muted" style={{ marginTop: '10px', marginBottom: 0, fontWeight: 700 }}>
+            {exportStatus}
+          </p>
+        )}
       </div>
     </div>
   );

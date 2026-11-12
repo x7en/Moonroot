@@ -123,7 +123,7 @@ export function makeDefaultProfile(nowIso: Stamp = getLocalStamp()): Profile {
     conditionsNote: '',
     medicationsNote: '',
     sproutName: null,
-    theme: 'dusk',
+    theme: 'dawn',
     units: { temperature: 'C', water: 'ml' },
     reminders: {
       daily: { on: false, time: '20:00' },
@@ -348,7 +348,7 @@ function resolveWidgetAccent(theme: Profile['theme']): string {
   const effective = theme === 'auto' || theme === 'system' ? (prefersLightTheme() ? 'dawn' : 'dusk') : theme;
   switch (effective) {
     case 'dawn':
-      return '#2A8C64';
+      return '#700143';
     case 'meadow':
       return '#6EC4A8';
     case 'ocean':
@@ -358,9 +358,10 @@ function resolveWidgetAccent(theme: Profile['theme']): string {
     case 'high-contrast':
       return '#00E5A3';
     case 'midnight':
+      return '#84D9B2';
     case 'dusk':
     default:
-      return '#7ACBA5';
+      return '#CFD78C';
   }
 }
 

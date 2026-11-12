@@ -1,4 +1,4 @@
-import '@fontsource/fraunces/latin-600.css';
+import '@fontsource/young-serif/latin-400.css';
 import '@fontsource/atkinson-hyperlegible/latin-400.css';
 import '@fontsource/atkinson-hyperlegible/latin-700.css';
 import './styles/tokens.css';

@@ -68,6 +68,8 @@ export function RecordScreen({
   const [visitDate, setVisitDate] = useState<string>(today);
   const [visitNote, setVisitNote] = useState<string>('');
   const [baselineDate, setBaselineDate] = useState<string>(today);
+  const [visitSaved, setVisitSaved] = useState('');
+  const [medStatus, setMedStatus] = useState('');
 
   const step2 = computeStep2Snapshot(
     {
@@ -109,6 +111,7 @@ export function RecordScreen({
       note: visitNote.trim(),
     });
     setVisitNote('');
+    setVisitSaved(`Saved visit for ${visitDate}.`);
   }
 
   async function toggleIgnoreCycle(startDate: DateKey, currentlyIgnored: boolean): Promise<void> {
@@ -130,14 +133,16 @@ export function RecordScreen({
 
   return (
     <div>
+      <h1 class="screen-title">Record</h1>
+
       {backupOverdue && (
-        <section class="card" aria-label="Backup reminder" style={{ borderColor: 'var(--lamp)' }}>
+        <section class="card" aria-label="Backup reminder">
           <h2 class="card-title">Backup reminder</h2>
           <p class="muted" style={{ marginTop: 0 }}>
             Save a private backup file in case your phone is lost or cleared.
           </p>
           <div class="btn-row">
-            <button type="button" class="btn btn-lamp" onClick={onQuickExportBackup}>
+            <button type="button" class="btn btn-primary" onClick={onQuickExportBackup}>
               Save backup in Settings
             </button>
             <button type="button" class="btn btn-small" onClick={() => void onSnoozeBackup()}>
@@ -151,12 +156,15 @@ export function RecordScreen({
         <div class="btn-row" style={{ justifyContent: 'space-between' }}>
           <div>
             <h2 class="card-title" style={{ marginBottom: '2px' }}>
-              Record
+              Doctor summary
             </h2>
             <p class="muted" style={{ margin: 0 }}>
-              <span class="tabular">{dayLogs.length}</span> days ·{' '}
-              <span class="tabular">{step2.cycles.cycles.length}</span> cycles ·{' '}
-              <span class="tabular">{medicines.length}</span> medicines
+              <span class="tabular">{dayLogs.length}</span>{' '}
+              {dayLogs.length === 1 ? 'day' : 'days'} ·{' '}
+              <span class="tabular">{step2.cycles.cycles.length}</span>{' '}
+              {step2.cycles.cycles.length === 1 ? 'cycle' : 'cycles'} ·{' '}
+              <span class="tabular">{medicines.length}</span>{' '}
+              {medicines.length === 1 ? 'medicine' : 'medicines'}
             </p>
           </div>
           <button type="button" class="btn btn-primary" onClick={onOpenDoctorFile}>
@@ -197,15 +205,7 @@ export function RecordScreen({
             .reverse()
             .slice(0, 12)
             .map((c) => (
-              <div
-                key={c.id}
-                class="btn-row"
-                style={{
-                  justifyContent: 'space-between',
-                  paddingBlock: '8px',
-                  borderBottom: '1px solid var(--border)',
-                }}
-              >
+              <div key={c.id} class="row-stack">
                 <div>
                   <div class="tabular">
                     <strong>{c.startDate}</strong> · {c.lengthDays} days ({c.bleedingDays} bleeding days)
@@ -269,7 +269,7 @@ export function RecordScreen({
         <section class="card" aria-label="Standing history flags">
           <h2 class="card-title">Standing patterns</h2>
           {step2.triageToday.standingFlags.map((flag) => (
-            <div key={flag.ruleId} style={{ paddingBlock: '6px', borderTop: '1px solid var(--border)' }}>
+            <div key={flag.ruleId} class="row-stack" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
               <strong>
                 {flag.ruleId}: {flag.title}
               </strong>
@@ -285,15 +285,7 @@ export function RecordScreen({
         <section class="card" aria-label="Verdict and flag history">
           <h2 class="card-title">Flag history</h2>
           {sortedVerdicts.slice(0, 10).map((v) => (
-            <div
-              key={v.id}
-              class="btn-row"
-              style={{
-                justifyContent: 'space-between',
-                paddingBlock: '8px',
-                borderBottom: '1px solid var(--border)',
-              }}
-            >
+            <div key={v.id} class="row-stack">
               <div>
                 <div class="tabular">
                   <strong>{v.at.slice(0, 10)}</strong> · {v.title} ({v.ruleIds.join(', ') || v.level})
@@ -375,15 +367,7 @@ export function RecordScreen({
           </p>
         ) : (
           sortedMeds.map((med) => (
-            <div
-              key={med.id}
-              class="btn-row"
-              style={{
-                justifyContent: 'space-between',
-                paddingBlock: '8px',
-                borderBottom: '1px solid var(--border)',
-              }}
-            >
+            <div key={med.id} class="row-stack">
               <div>
                 <div class="tabular">
                   <strong>{med.nameShown}</strong> · {med.date}
@@ -400,12 +384,20 @@ export function RecordScreen({
                 type="button"
                 class="btn btn-small"
                 aria-label={`Remove ${med.nameShown} on ${med.date}`}
-                onClick={() => void onDeleteMedicine(med.id)}
+                onClick={() => {
+                  void onDeleteMedicine(med.id);
+                  setMedStatus(`Removed ${med.nameShown}.`);
+                }}
               >
                 Remove
               </button>
             </div>
           ))
+        )}
+        {medStatus && (
+          <p role="status" class="muted" style={{ marginTop: '8px', marginBottom: 0, fontWeight: 700 }}>
+            {medStatus}
+          </p>
         )}
       </section>
 
@@ -437,6 +429,11 @@ export function RecordScreen({
           <button type="submit" class="btn">
             Save doctor visit
           </button>
+          {visitSaved && (
+            <p role="status" class="muted" style={{ marginTop: '8px', marginBottom: 0, fontWeight: 700 }}>
+              {visitSaved}
+            </p>
+          )}
         </form>
 
         {sortedVisits.length === 0 ? (
@@ -445,7 +442,7 @@ export function RecordScreen({
           </p>
         ) : (
           sortedVisits.map((v) => (
-            <div key={v.id} style={{ paddingBlock: '6px', borderTop: '1px solid var(--border)' }}>
+            <div key={v.id} class="row-stack" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
               <strong class="tabular">{v.date}</strong>
               {v.note ? <div class="muted">{v.note}</div> : null}
             </div>
@@ -471,7 +468,7 @@ export function RecordScreen({
                 <div style={{ fontWeight: 700 }}>
                   {earned ? `★ ${badge.name}` : badge.name}
                 </div>
-                <div class="muted" style={{ fontSize: '0.85rem' }}>
+                <div class="muted" style={{ fontSize: '0.875rem' }}>
                   {badge.description}
                 </div>
               </div>

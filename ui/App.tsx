@@ -32,13 +32,43 @@ import { DoctorFileSheet } from './components/DoctorFileSheet';
 import { GetHelpSheet } from './components/GetHelpSheet';
 import { AskScreen } from './screens/AskScreen';
 import { BodyScreen } from './screens/BodyScreen';
-import { GraphsScreen } from './screens/GraphsScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { PinLockScreen } from './screens/PinLockScreen';
 import { CycleScreen } from './screens/CycleScreen';
 import { RecordScreen } from './screens/RecordScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { TodayScreen } from './screens/TodayScreen';
+
+type GraphsScreenComponent = typeof import('./screens/GraphsScreen').GraphsScreen;
+
+function isKnownAppPath(): boolean {
+  if (typeof window === 'undefined') return true;
+  const proto = window.location.protocol;
+  if (proto === 'file:' || proto === 'capacitor:') return true;
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  const normalizedBase = base === '' ? '/' : base;
+  return (
+    path === normalizedBase ||
+    path === '/' ||
+    path === `${base}/index.html` ||
+    path === '/index.html'
+  );
+}
+
+function BrandMarkIcon() {
+  const iconSrc = `${import.meta.env.BASE_URL}icons/moonroot-icon.svg`;
+  return (
+    <img
+      src={iconSrc}
+      alt=""
+      width={24}
+      height={24}
+      class="brand-mark-img"
+      aria-hidden="true"
+    />
+  );
+}
 
 type Tab = 'today' | 'cycle' | 'record' | 'body' | 'settings';
 type SubView =
@@ -57,9 +87,12 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   const [tick, setTick] = useState(0);
   const [tab, setTab] = useState<Tab>('today');
   const [subView, setSubView] = useState<SubView>(null);
+  const [notFound, setNotFound] = useState(() => !isKnownAppPath());
   const [selectedDate, setSelectedDate] = useState<DateKey>(() => getLocalDateKey());
   const [getHelpOpen, setGetHelpOpen] = useState(false);
   const [doctorFileOpen, setDoctorFileOpen] = useState(false);
+  const [GraphsScreenComp, setGraphsScreenComp] = useState<GraphsScreenComponent | null>(null);
+  const [saveError, setSaveError] = useState('');
   const [undoState, setUndoState] = useState<UndoState | null>(null);
   const [activeReaction, setActiveReaction] = useState<SproutReaction | null>(null);
   const [activePetalBurst, setActivePetalBurst] = useState(false);
@@ -75,6 +108,18 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
 
   useEffect(() => {
     let active = true;
+    if (subView?.kind === 'graphs' && !GraphsScreenComp) {
+      void import('./screens/GraphsScreen').then((mod) => {
+        if (active) setGraphsScreenComp(() => mod.GraphsScreen);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [subView, GraphsScreenComp]);
+
+  useEffect(() => {
+    let active = true;
     let cleanupDeepLink: () => void = () => {};
     void store.init().then(async () => {
       if (store.snapshot.profile && !store.locked) {
@@ -87,6 +132,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
     });
     void registerCheckInDeepLink(() => {
       if (!active) return;
+      setNotFound(false);
       setSubView(null);
       setTab('today');
       setSelectedDate(getLocalDateKey());
@@ -112,7 +158,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   const reducedMotion = Boolean(profile?.reducedMotion) || prefersReducedMotion();
   const hapticsEnabled = profile?.haptics !== false;
   const soundEnabled = Boolean(profile?.sound);
-  const rawTheme = profile?.theme ?? 'dusk';
+  const rawTheme = profile?.theme ?? 'dawn';
   const resolvedTheme =
     rawTheme === 'auto'
       ? prefersLightTheme()
@@ -120,7 +166,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
         : 'dusk'
       : canUseTheme(rawTheme, store.snapshot.companion)
         ? rawTheme
-        : 'dusk';
+        : 'dawn';
   const nightGarden = store.snapshot.companion.stage >= 6;
 
   useEffect(() => {
@@ -128,6 +174,30 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
     document.documentElement.setAttribute('data-reduced-motion', reducedMotion ? 'true' : 'false');
     document.documentElement.setAttribute('data-night-garden', nightGarden ? 'true' : 'false');
   }, [resolvedTheme, reducedMotion, nightGarden]);
+
+  function goToday(): void {
+    if (notFound && typeof window !== 'undefined') {
+      const base = import.meta.env.BASE_URL || '/';
+      try {
+        window.history.replaceState(null, '', base);
+      } catch {
+        // Ignore history restriction in non-HTTP contexts
+      }
+    }
+    setNotFound(false);
+    setSubView(null);
+    setTab('today');
+  }
+
+  async function runSave<T>(fn: () => Promise<T>): Promise<T | undefined> {
+    setSaveError('');
+    try {
+      return await fn();
+    } catch {
+      setSaveError("Couldn't save. Your entry is still here. Try again.");
+      return undefined;
+    }
+  }
 
   function fireReaction(reaction: SproutReaction): void {
     setActiveReaction(reaction);
@@ -167,6 +237,37 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
     );
   }
 
+  if (notFound) {
+    return (
+      <div class="app-shell">
+        <header class="top-bar">
+          <button type="button" class="brand-wordmark" onClick={goToday}>
+            <BrandMarkIcon />
+            <span>Moonroot</span>
+          </button>
+          <button type="button" class="btn btn-help" onClick={() => setGetHelpOpen(true)}>
+            Get help
+          </button>
+        </header>
+        <main>
+          <section class="card" aria-label="Page not found">
+            <h1 class="screen-title">Page not found</h1>
+            <p>This page is not in Moonroot.</p>
+            <button type="button" class="btn btn-primary" onClick={goToday}>
+              Today
+            </button>
+          </section>
+        </main>
+        <GetHelpSheet
+          open={getHelpOpen}
+          under18={Boolean(profile && isUnder18(profile, today))}
+          regionInfo={getRegionEmergencyInfo(profile?.region ?? 'PK')}
+          onClose={() => setGetHelpOpen(false)}
+        />
+      </div>
+    );
+  }
+
   if (store.locked) {
     return (
       <PinLockScreen
@@ -190,7 +291,10 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
     return (
       <div class="app-shell">
         <header class="top-bar">
-          <h1 class="brand-title">Moonroot</h1>
+          <button type="button" class="brand-wordmark" onClick={goToday}>
+            <BrandMarkIcon />
+            <span>Moonroot</span>
+          </button>
           <button type="button" class="btn btn-help" onClick={() => setGetHelpOpen(true)}>
             Get help
           </button>
@@ -199,9 +303,11 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
           today={today}
           nowIso={nowIso}
           onComplete={async (nextProfile) => {
-            await store.saveProfile(nextProfile);
-            await store.syncTriageState();
-            refresh();
+            await runSave(async () => {
+              await store.saveProfile(nextProfile);
+              await store.syncTriageState();
+              refresh();
+            });
           }}
         />
         <GetHelpSheet
@@ -218,7 +324,8 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
   const regionInfo = getRegionEmergencyInfo(profile.region);
 
   async function handleSaveDayLog(log: DayLog): Promise<void> {
-    const prev = await store.saveDayLog(log);
+    const prev = await runSave(() => store.saveDayLog(log));
+    if (prev === undefined) return;
     triggerHaptic('light', hapticsEnabled, reducedMotion);
     playGentleChime('checkin', soundEnabled);
     const currentStage = store.lastCompanionEvent?.newStage ?? store.snapshot.companion.stage;
@@ -236,19 +343,24 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
 
   async function handleUndo(): Promise<void> {
     if (!undoState) return;
-    await store.restorePreviousDayLog(undoState.date, undoState.previous);
+    const snap = undoState;
+    const ok = await runSave(() => store.restorePreviousDayLog(snap.date, snap.previous));
+    if (ok === undefined && saveError) return;
     setUndoState(null);
     refresh();
   }
 
   async function handleSaveProfile(next: Profile): Promise<void> {
-    await store.saveProfile(next);
-    await store.syncTriageState();
-    refresh();
+    await runSave(async () => {
+      await store.saveProfile(next);
+      await store.syncTriageState();
+      refresh();
+    });
   }
 
   async function handleSaveBodyLog(log: BodyLog): Promise<void> {
-    const prev = await store.saveBodyLog(log);
+    const prev = await runSave(() => store.saveBodyLog(log));
+    if (prev === undefined) return;
     const waterChanged = JSON.stringify(prev?.water) !== JSON.stringify(log.water) && log.water;
     const sleepChanged = JSON.stringify(prev?.sleep) !== JSON.stringify(log.sleep) && log.sleep;
     const mealsChanged = JSON.stringify(prev?.meals) !== JSON.stringify(log.meals) && log.meals;
@@ -283,14 +395,19 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
       context: Object.keys(nextContext).length > 0 ? nextContext : undefined,
       updatedAt: nowIso,
     };
-    await store.saveDayLog(nextLog);
-    refresh();
+    await runSave(async () => {
+      await store.saveDayLog(nextLog);
+      refresh();
+    });
   }
 
   return (
     <div class="app-shell" data-tick={tick}>
       <header class="top-bar">
-        <h1 class="brand-title">Moonroot</h1>
+        <button type="button" class="brand-wordmark" onClick={goToday}>
+          <BrandMarkIcon />
+          <span>Moonroot</span>
+        </button>
         <div class="top-actions">
           <button type="button" class="btn btn-help" onClick={() => setGetHelpOpen(true)}>
             Get help
@@ -324,34 +441,48 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
       </header>
 
       <main>
-        {subView?.kind === 'graphs' && (
-          <GraphsScreen
-            today={today}
-            nowIso={nowIso}
-            profile={profile}
-            dayLogs={store.snapshot.dayLogs}
-            bodyLogs={store.snapshot.bodyLogs}
-            decisions={store.snapshot.decisions}
-            forecasts={store.snapshot.forecasts}
-            medicines={store.snapshot.medicines}
-            verdicts={store.snapshot.verdicts}
-            watchItems={store.snapshot.watchItems}
-            visits={store.snapshot.visits}
-            meta={store.snapshot.meta}
-            returnLabel={
-              subView.returnTab === 'cycle'
-                ? 'Cycle'
-                : subView.returnTab === 'body'
-                  ? 'Body'
-                  : 'Record'
-            }
-            onBack={() => {
-              const target = subView.returnTab;
-              setSubView(null);
-              setTab(target);
-            }}
-          />
+        {saveError && (
+          <div class="notice-banner row-stack" role="alert">
+            <span>{saveError}</span>
+            <button type="button" class="btn btn-small" onClick={() => setSaveError('')}>
+              Dismiss
+            </button>
+          </div>
         )}
+
+        {subView?.kind === 'graphs' &&
+          (GraphsScreenComp ? (
+            <GraphsScreenComp
+              today={today}
+              nowIso={nowIso}
+              profile={profile}
+              dayLogs={store.snapshot.dayLogs}
+              bodyLogs={store.snapshot.bodyLogs}
+              decisions={store.snapshot.decisions}
+              forecasts={store.snapshot.forecasts}
+              medicines={store.snapshot.medicines}
+              verdicts={store.snapshot.verdicts}
+              watchItems={store.snapshot.watchItems}
+              visits={store.snapshot.visits}
+              meta={store.snapshot.meta}
+              returnLabel={
+                subView.returnTab === 'cycle'
+                  ? 'Cycle'
+                  : subView.returnTab === 'body'
+                    ? 'Body'
+                    : 'Record'
+              }
+              onBack={() => {
+                const target = subView.returnTab;
+                setSubView(null);
+                setTab(target);
+              }}
+            />
+          ) : (
+            <section class="card" aria-label="Loading graphs">
+              <p style={{ margin: 0 }}>Loading graphs...</p>
+            </section>
+          ))}
 
         {subView?.kind === 'ask' && (
           <AskScreen
@@ -395,34 +526,46 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             onChangeDate={(date) => setSelectedDate(date)}
             onSaveDayLog={handleSaveDayLog}
             onSaveDecision={async (dec: Decision) => {
-              await store.saveDecision(dec);
-              applyCompanionOutcome(store.lastCompanionEvent);
-              refresh();
+              await runSave(async () => {
+                await store.saveDecision(dec);
+                applyCompanionOutcome(store.lastCompanionEvent);
+                refresh();
+              });
             }}
             onDismissEvent={async (verdictId) => {
-              await store.dismissEventCard(verdictId);
-              refresh();
+              await runSave(async () => {
+                await store.dismissEventCard(verdictId);
+                refresh();
+              });
             }}
             onDismissStandingPrompt={async (
               ruleId: StandingFlagId,
               title: string,
               reason: string,
             ) => {
-              await store.dismissStandingPrompt(ruleId, title, reason);
-              refresh();
+              await runSave(async () => {
+                await store.dismissStandingPrompt(ruleId, title, reason);
+                refresh();
+              });
             }}
             onAnswerWatchItem={async (watchId, answers) => {
-              await store.answerWatchCheck(watchId, answers);
-              applyCompanionOutcome(store.lastCompanionEvent);
-              refresh();
+              await runSave(async () => {
+                await store.answerWatchCheck(watchId, answers);
+                applyCompanionOutcome(store.lastCompanionEvent);
+                refresh();
+              });
             }}
             onSaveMedicine={async (entry: MedicineEntry) => {
-              await store.saveMedicine(entry);
-              refresh();
+              await runSave(async () => {
+                await store.saveMedicine(entry);
+                refresh();
+              });
             }}
             onSaveVisit={async (visit: DoctorVisit) => {
-              await store.saveVisit(visit);
-              refresh();
+              await runSave(async () => {
+                await store.saveVisit(visit);
+                refresh();
+              });
             }}
             onOpenWeeklyReview={async () => {
               const out = await store.openWeeklyReview(today, nowIso);
@@ -452,16 +595,22 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               setTab('today');
             }}
             onSaveApproximatePeriod={async (startDate, durationDays) => {
-              await store.saveApproximatePeriod(startDate, durationDays, nowIso);
-              refresh();
+              await runSave(async () => {
+                await store.saveApproximatePeriod(startDate, durationDays, nowIso);
+                refresh();
+              });
             }}
             onSaveDecision={async (dec: Decision) => {
-              await store.saveDecision(dec);
-              refresh();
+              await runSave(async () => {
+                await store.saveDecision(dec);
+                refresh();
+              });
             }}
             onDeleteDecision={async (id) => {
-              await store.deleteDecision(id);
-              refresh();
+              await runSave(async () => {
+                await store.deleteDecision(id);
+                refresh();
+              });
             }}
             onOpenGraphs={() => setSubView({ kind: 'graphs', returnTab: 'cycle' })}
           />
@@ -486,25 +635,35 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
               setTab('today');
             }}
             onSaveDecision={async (dec: Decision) => {
-              await store.saveDecision(dec);
-              applyCompanionOutcome(store.lastCompanionEvent);
-              refresh();
+              await runSave(async () => {
+                await store.saveDecision(dec);
+                applyCompanionOutcome(store.lastCompanionEvent);
+                refresh();
+              });
             }}
             onDeleteDecision={async (id) => {
-              await store.deleteDecision(id);
-              refresh();
+              await runSave(async () => {
+                await store.deleteDecision(id);
+                refresh();
+              });
             }}
             onDeleteMedicine={async (id) => {
-              await store.deleteMedicine(id);
-              refresh();
+              await runSave(async () => {
+                await store.deleteMedicine(id);
+                refresh();
+              });
             }}
             onSaveVisit={async (visit: DoctorVisit) => {
-              await store.saveVisit(visit);
-              refresh();
+              await runSave(async () => {
+                await store.saveVisit(visit);
+                refresh();
+              });
             }}
             onDismissEvent={async (verdictId) => {
-              await store.dismissEventCard(verdictId);
-              refresh();
+              await runSave(async () => {
+                await store.dismissEventCard(verdictId);
+                refresh();
+              });
             }}
             onOpenDoctorFile={() => {
               void store.markDoctorFileCreated(today).then((out) => {
@@ -546,6 +705,7 @@ export function App({ initialStore }: { initialStore?: MoonrootStore } = {}) {
             onSaveBodyLog={handleSaveBodyLog}
             onSaveStress={handleSaveStress}
             onOpenGraphs={() => setSubView({ kind: 'graphs', returnTab: 'body' })}
+            onTapSprout={goToday}
           />
         )}
 

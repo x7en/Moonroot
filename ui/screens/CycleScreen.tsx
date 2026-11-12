@@ -14,6 +14,7 @@ import type {
   Verdict,
   WatchItem,
 } from '../../core/model/types';
+import { ScatteredDots } from '../components/ScatteredDots';
 
 interface CycleScreenProps {
   today: DateKey;
@@ -187,33 +188,40 @@ export function CycleScreen({
 
   return (
     <div>
-      <section class="card" aria-label="Confidence meter">
-        <span class="field-label">Confidence</span>
-        <div class="confidence-hero tabular" aria-label={`Confidence ${confidence.score} percent`}>
-          {confidence.score}%
-        </div>
+      <h1 class="screen-title">Cycle</h1>
 
-        {confidence.effectiveCycles === 0 && !cycles.openCycle ? (
-          <div>
-            <p style={{ margin: '6px 0 4px 0', fontWeight: 700 }}>Log your first period to start.</p>
-            <p class="muted" style={{ margin: 0 }}>
-              Each period you log tightens your ranges. Next-period ranges unlock after 1 period
-              start, cycle track record after 2 completed cycles, and lead-in patterns after 4 cycles.
-            </p>
-            <div class="btn-row" style={{ marginTop: '12px' }}>
-              <button type="button" class="btn btn-primary" onClick={() => onEditDay(today)}>
-                Log on Today
-              </button>
-              <button
-                type="button"
-                class="btn"
-                onClick={() => setBackfillOpen(true)}
-              >
-                Add earlier periods
-              </button>
-            </div>
+      <section
+        class={`card${confidence.effectiveCycles === 0 && !cycles.openCycle ? ' dots-backdrop' : ''}`}
+        aria-label="Confidence meter"
+      >
+        {confidence.effectiveCycles === 0 && !cycles.openCycle && <ScatteredDots tone="surface" />}
+        <div class="dots-content">
+          <span class="field-label">Confidence</span>
+          <div class="confidence-hero tabular" aria-label={`Confidence ${confidence.score} percent`}>
+            {confidence.score}%
           </div>
-        ) : (
+
+          {confidence.effectiveCycles === 0 && !cycles.openCycle ? (
+            <div>
+              <p style={{ margin: '6px 0 4px 0', fontWeight: 700 }}>Log your first period to start.</p>
+              <p class="muted" style={{ margin: 0 }}>
+                Next-period ranges unlock after 1 start. Track record unlocks after 2 cycles, and
+                lead-in patterns after 4.
+              </p>
+              <div class="btn-row" style={{ marginTop: '12px' }}>
+                <button type="button" class="btn btn-primary" onClick={() => onEditDay(today)}>
+                  Log on Today
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  onClick={() => setBackfillOpen(true)}
+                >
+                  Add earlier periods
+                </button>
+              </div>
+            </div>
+          ) : (
           <div>
             {prediction.likelyWidthDays !== null ? (
               <p class="muted tabular" style={{ margin: '2px 0 6px 0' }}>
@@ -248,12 +256,13 @@ export function CycleScreen({
           </div>
         )}
         {onOpenGraphs && (
-          <div class="btn-row" style={{ marginTop: '12px' }}>
+          <div class="btn-row dots-content" style={{ marginTop: '12px' }}>
             <button type="button" class="btn" onClick={onOpenGraphs}>
               Graphs
             </button>
           </div>
         )}
+        </div>
       </section>
 
       <section class="card" aria-label="Next period forecast">
@@ -448,8 +457,8 @@ export function CycleScreen({
               surge, meaning ovulation is likely within 24 to 36 hours.
             </p>
             <p class="muted" style={{ margin: 0 }}>
-              With very irregular cycles it often says not enough signals yet, and a doctor has
-              better ways to check.
+              Irregular cycles often stay at not enough signals yet. A doctor has better ways to
+              check.
             </p>
           </div>
         </div>
@@ -463,7 +472,7 @@ export function CycleScreen({
             aria-label="Previous month"
             onClick={prevMonth}
           >
-            Prev
+            Previous
           </button>
           <h2 class="card-title tabular" style={{ margin: 0 }}>
             {MONTH_NAMES[viewMonth - 1]} {viewYear}
@@ -513,7 +522,7 @@ export function CycleScreen({
               .filter(Boolean)
               .join(' ');
 
-            const statusParts: string[] = [dateKey];
+            const statusParts: string[] = [`${dateKey}, day ${dayNum}`];
             if (dateKey === today) statusParts.push('today');
             if (log?.flow) statusParts.push(`${log.flow} flow`);
             if (inLikely) statusParts.push('likely window');
@@ -536,13 +545,7 @@ export function CycleScreen({
           })}
         </div>
 
-        <div
-          style={{
-            marginTop: '12px',
-            paddingTop: '12px',
-            borderTop: '1px solid var(--border)',
-          }}
-        >
+        <div class="row-stack" style={{ marginTop: '12px', flexDirection: 'column', alignItems: 'flex-start' }}>
           <p class="tabular" style={{ margin: '0 0 6px 0' }}>
             <strong>{browsedDate}</strong>:{' '}
             {browsedLog

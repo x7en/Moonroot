@@ -3,6 +3,7 @@ import { createPinLock, makeDefaultProfile } from '../../app/store';
 import { isUnder18 } from '../../core/model/dates';
 import type { DateKey, Profile } from '../../core/model/types';
 import { requestNativeNotificationPermission } from '../../platform/native';
+import { ScatteredDots } from '../components/ScatteredDots';
 
 interface OnboardingScreenProps {
   today: DateKey;
@@ -86,41 +87,39 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
   }
 
   return (
-    <main class="card" aria-label="Onboarding">
-      <p class="muted tabular" style={{ marginTop: 0 }}>
-        Step {step} of 6
-      </p>
+    <main class="card dots-backdrop" aria-label="Onboarding">
+      {step === 1 && <ScatteredDots tone="surface" />}
+      <div class="dots-content">
+        {step === 1 && (
+          <div>
+            <h1 class="screen-title">Welcome to Moonroot</h1>
+            <p>Everything stays on this phone. No account, no cloud sync, no internet needed.</p>
+            <p class="notice-banner">
+              Private on-device check-in intelligence: entries stay on this phone and are sorted locally.
+            </p>
+            <label class="chip" style={{ width: '100%', marginBottom: '16px' }}>
+              <input
+                type="checkbox"
+                checked={accepted}
+                onChange={(e) => setAccepted((e.target as HTMLInputElement).checked)}
+              />
+              <span>This app tracks and sorts urgency. It does not diagnose.</span>
+            </label>
+            <button
+              type="button"
+              class="btn btn-primary"
+              style={{ width: '100%' }}
+              disabled={!accepted}
+              onClick={() => setStep(2)}
+            >
+              Continue
+            </button>
+          </div>
+        )}
 
-      {step === 1 && (
-        <div>
-          <h2 class="card-title">Welcome to Moonroot</h2>
-          <p>Everything stays on this phone. No account, no cloud sync, no internet needed.</p>
-          <p class="notice-banner">
-            Private on-device check-in intelligence: entries stay on this phone and are sorted locally.
-          </p>
-          <label class="chip" style={{ width: '100%', marginBottom: '16px' }}>
-            <input
-              type="checkbox"
-              checked={accepted}
-              onChange={(e) => setAccepted((e.target as HTMLInputElement).checked)}
-            />
-            <span>This app tracks and sorts urgency. It does not diagnose.</span>
-          </label>
-          <button
-            type="button"
-            class="btn btn-primary"
-            style={{ width: '100%' }}
-            disabled={!accepted}
-            onClick={() => setStep(2)}
-          >
-            Continue
-          </button>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div>
-          <h2 class="card-title">About you</h2>
+        {step === 2 && (
+          <div>
+            <h1 class="screen-title">About you</h1>
           <p class="muted">You can skip any of these and change them later in Settings.</p>
           <div class="field">
             <label htmlFor="onb-birth-year">Birth year (optional)</label>
@@ -183,7 +182,7 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
 
       {step === 3 && (
         <div>
-          <h2 class="card-title">Your cycles</h2>
+          <h1 class="screen-title">Your cycles</h1>
           <div class="field">
             <span class="field-label">How do your cycles usually feel?</span>
             <div class="chip-group">
@@ -232,7 +231,7 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
 
       {step === 4 && (
         <div>
-          <h2 class="card-title">Health context</h2>
+          <h1 class="screen-title">Health context</h1>
           <div class="field">
             <span class="field-label">Are you taking any hormone medicine?</span>
             <div class="chip-group">
@@ -270,8 +269,7 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
             <span class="field-label">Pregnancy questions</span>
             {under18 ? (
               <p class="muted" style={{ marginTop: 0 }}>
-                Because age is under 18 or unknown, only a neutral pregnancy question can appear
-                when relevant to a symptom.
+                Since you are under 18, only a neutral pregnancy question can appear.
               </p>
             ) : (
               <div class="chip-group">
@@ -308,7 +306,7 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
 
       {step === 5 && (
         <div>
-          <h2 class="card-title">Reminders and privacy</h2>
+          <h1 class="screen-title">Reminders and privacy</h1>
           <label class="chip" style={{ width: '100%', marginBottom: '12px' }}>
             <input
               type="checkbox"
@@ -356,7 +354,7 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
             </span>
           </div>
           {pinError && (
-            <p role="alert" style={{ color: 'var(--level-red)', fontWeight: 700 }}>
+            <p role="alert" style={{ fontWeight: 700 }}>
               {pinError}
             </p>
           )}
@@ -373,14 +371,14 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
 
       {step === 6 && (
         <div>
-          <h2 class="card-title">Ready to record</h2>
+          <h1 class="screen-title">Ready to record</h1>
           <p
             class="tabular"
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '2.75rem',
+              fontWeight: 700,
+              fontSize: '1.5rem',
               margin: '8px 0',
-              color: 'var(--accent)',
+              color: 'var(--text)',
             }}
           >
             10%
@@ -405,6 +403,7 @@ export function OnboardingScreen({ today, nowIso, onComplete }: OnboardingScreen
           </div>
         </div>
       )}
+      </div>
     </main>
   );
 }

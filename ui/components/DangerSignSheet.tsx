@@ -157,14 +157,14 @@ export function DangerSignSheet({
         </div>
 
         {selected.length > 0 && (
-          <div class="notice-banner" style={{ borderColor: 'var(--level-red)' }}>
+          <div class="notice-banner">
             <p style={{ marginTop: 0 }}>
               You selected a warning sign. Saving updates your Today result right away. If you feel
               very unwell now, open Get help.
             </p>
             <button
               type="button"
-              class="btn btn-danger-solid"
+              class="btn btn-primary"
               onClick={() => {
                 onSave({
                   danger: selected,

@@ -115,7 +115,7 @@ export function MedicineSheet({
 
         {lastDose && (
           <div style={{ marginBottom: '12px' }}>
-            <button type="button" class="btn btn-lamp" onClick={handleRepeatLastDose}>
+            <button type="button" class="btn btn-primary" onClick={handleRepeatLastDose}>
               Same as last time ({lastDose.nameShown}
               {lastDose.units ? ` x${lastDose.units}` : ''})
             </button>
@@ -270,7 +270,7 @@ export function MedicineSheet({
         </div>
 
         {error && (
-          <p role="alert" style={{ color: 'var(--level-red)', fontWeight: 700 }}>
+          <p role="alert" style={{ fontWeight: 700 }}>
             {error}
           </p>
         )}

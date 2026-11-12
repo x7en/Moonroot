@@ -39,7 +39,7 @@ interface GraphsScreenProps {
   onBack: () => void;
 }
 
-const SERIES_COLORS = ['var(--accent)', 'var(--water)', 'var(--sleep)', 'var(--gut)'] as const;
+const SERIES_COLORS = ['var(--data-1)', 'var(--data-2)', 'var(--accent)', 'var(--text)'] as const;
 
 export function GraphsScreen({
   today,
@@ -106,12 +106,12 @@ export function GraphsScreen({
 
   return (
     <div>
-      <section class="card" aria-label="Graphs header">
+      <section aria-label="Graphs header" style={{ marginBottom: '14px' }}>
         <div class="btn-row" style={{ justifyContent: 'space-between' }}>
           <div>
-            <h2 class="card-title" style={{ marginBottom: '2px' }}>
+            <h1 class="screen-title" style={{ marginBottom: '4px' }}>
               Graphs
-            </h2>
+            </h1>
             <p class="muted" style={{ margin: 0 }}>
               Visuals from your saved entries only. Open anytime from Cycle, Body, or Record.
             </p>
@@ -123,59 +123,59 @@ export function GraphsScreen({
       </section>
 
       {/* 1. Confidence arc (10 to 95) */}
-      <section class="card" aria-label="Confidence arc graph">
-        <h3 class="card-title">Confidence arc</h3>
+      <section class="chart-section" aria-label="Confidence arc graph">
+        <h2 class="card-title">Confidence arc</h2>
         <svg
           class="graph-svg"
-          viewBox="0 0 240 148"
+          viewBox="0 0 240 156"
           role="img"
           aria-label={`Confidence arc at ${prediction.confidence.score} percent on a scale from 10 to 95`}
         >
           <path
             d={`M ${arc.trackStart.x} ${arc.trackStart.y} A 68 68 0 1 1 ${arc.trackEnd.x} ${arc.trackEnd.y}`}
             fill="none"
-            stroke="var(--surface-2)"
-            strokeWidth="14"
-            strokeLinecap="round"
+            stroke="var(--surface)"
+            stroke-width="14"
+            stroke-linecap="round"
           />
           {arc.sweepAngleDeg > 0 && (
             <path
               d={`M ${arc.trackStart.x} ${arc.trackStart.y} A 68 68 0 ${arc.largeArcFill} 1 ${arc.fillEnd.x} ${arc.fillEnd.y}`}
               fill="none"
-              stroke="var(--accent)"
-              strokeWidth="14"
-              strokeLinecap="round"
+              stroke="var(--data-1)"
+              stroke-width="14"
+              stroke-linecap="round"
             />
           )}
-          <circle cx={arc.fillEnd.x} cy={arc.fillEnd.y} r="7" fill="var(--lamp)" />
+          <circle cx={arc.fillEnd.x} cy={arc.fillEnd.y} r="7" fill="var(--data-2)" />
           <text
             x="120"
-            y="88"
-            textAnchor="middle"
-            fill="var(--accent)"
-            fontSize="28"
-            fontWeight="700"
-            fontFamily="var(--font-display)"
+            y="90"
+            text-anchor="middle"
+            fill="var(--data-1)"
+            font-size="28"
+            font-weight="700"
+            font-family="var(--font-body)"
           >
             {prediction.confidence.score}%
           </text>
           <text
-            x="52"
-            y="140"
-            textAnchor="middle"
+            x="61"
+            y="148"
+            text-anchor="middle"
             fill="var(--text-muted)"
-            fontSize="12"
-            fontWeight="700"
+            font-size="12"
+            font-weight="700"
           >
             10
           </text>
           <text
-            x="188"
-            y="140"
-            textAnchor="middle"
+            x="179"
+            y="148"
+            text-anchor="middle"
             fill="var(--text-muted)"
-            fontSize="12"
-            fontWeight="700"
+            font-size="12"
+            font-weight="700"
           >
             95
           </text>
@@ -188,8 +188,8 @@ export function GraphsScreen({
       </section>
 
       {/* 2. Forecast ribbon */}
-      <section class="card" aria-label="Forecast ribbon graph">
-        <h3 class="card-title">30-day forecast ribbon</h3>
+      <section class="chart-section" aria-label="Forecast ribbon graph">
+        <h2 class="card-title">30-day forecast ribbon</h2>
         {!prediction.anchor ? (
           <p class="muted" style={{ margin: 0 }}>
             Log your first period start to draw likely and possible forecast bands on this strip.
@@ -213,8 +213,7 @@ export function GraphsScreen({
                         width="9"
                         height="30"
                         rx="2"
-                        fill="var(--accent)"
-                        opacity="0.28"
+                        fill="var(--surface)"
                       />
                     )}
                     {pt.inLikely && (
@@ -224,8 +223,7 @@ export function GraphsScreen({
                         width="9"
                         height="38"
                         rx="2"
-                        fill="var(--accent)"
-                        opacity="0.88"
+                        fill="var(--data-1)"
                       />
                     )}
                     {pt.dotRadius > 0 && (
@@ -233,7 +231,7 @@ export function GraphsScreen({
                         cx={x + 4.5}
                         cy="41"
                         r={pt.dotRadius}
-                        fill={pt.flow === 'spotting' ? 'var(--spotting)' : 'var(--flow)'}
+                        fill="var(--data-2)"
                       />
                     )}
                     {pt.isToday && (
@@ -242,34 +240,34 @@ export function GraphsScreen({
                         y1="14"
                         x2={x + 4.5}
                         y2="68"
-                        stroke="var(--lamp)"
-                        strokeWidth="2.5"
+                        stroke="var(--text)"
+                        stroke-width="2.5"
                       />
                     )}
                   </g>
                 );
               })}
-              <text x="10" y="84" fill="var(--text-muted)" fontSize="12">
+              <text x="10" y="84" fill="var(--text-muted)" font-size="12">
                 {addDays(today, -14).slice(5)}
               </text>
-              <text x="154" y="13" textAnchor="middle" fill="var(--lamp)" fontSize="12" fontWeight="700">
+              <text x="154" y="13" text-anchor="middle" fill="var(--text)" font-size="12" font-weight="700">
                 Today
               </text>
-              <text x="310" y="84" textAnchor="end" fill="var(--text-muted)" fontSize="12">
+              <text x="310" y="84" text-anchor="end" fill="var(--text-muted)" font-size="12">
                 {addDays(today, 15).slice(5)}
               </text>
             </svg>
             <div class="graph-legend">
               <span class="graph-legend-item">
-                <span class="graph-swatch" style={{ backgroundColor: 'var(--accent)' }} />
+                <span class="graph-swatch" style={{ backgroundColor: 'var(--data-1)' }} />
                 Likely band
               </span>
               <span class="graph-legend-item">
-                <span class="graph-swatch" style={{ backgroundColor: 'var(--accent)', opacity: 0.35 }} />
+                <span class="graph-swatch" style={{ backgroundColor: 'var(--surface)' }} />
                 Possible band
               </span>
               <span class="graph-legend-item">
-                <span class="graph-swatch" style={{ backgroundColor: 'var(--flow)', borderRadius: '999px' }} />
+                <span class="graph-swatch" style={{ backgroundColor: 'var(--data-2)', borderRadius: '999px' }} />
                 Logged flow
               </span>
             </div>
@@ -278,8 +276,8 @@ export function GraphsScreen({
       </section>
 
       {/* 3. Cycle length bars */}
-      <section class="card" aria-label="Cycle bars graph">
-        <h3 class="card-title">Cycle length bars</h3>
+      <section class="chart-section" aria-label="Cycle bars graph">
+        <h2 class="card-title">Cycle length bars</h2>
         {cycleBars.bars.length === 0 ? (
           <p class="muted" style={{ margin: 0 }}>
             Log two period starts to draw cycle bars, your median line, and typical range.
@@ -302,8 +300,7 @@ export function GraphsScreen({
                     y={topY}
                     width="282"
                     height={Math.max(4, botY - topY)}
-                    fill="var(--surface-2)"
-                    opacity="0.9"
+                    fill="var(--surface)"
                   />
                 );
               })()}
@@ -314,15 +311,15 @@ export function GraphsScreen({
                   y1={16 + (1 - cycleBars.medianDays / cycleBars.maxScaleDays) * 108}
                   x2="310"
                   y2={16 + (1 - cycleBars.medianDays / cycleBars.maxScaleDays) * 108}
-                  stroke="var(--lamp)"
-                  strokeWidth="2"
-                  strokeDasharray="4 4"
+                  stroke="var(--data-2)"
+                  stroke-width="2"
+                  stroke-dasharray="4 4"
                 />
               )}
-              <text x="4" y="24" fill="var(--text-muted)" fontSize="12">
+              <text x="4" y="24" fill="var(--text-muted)" font-size="12">
                 {cycleBars.maxScaleDays}d
               </text>
-              <text x="4" y="124" fill="var(--text-muted)" fontSize="12">
+              <text x="4" y="124" fill="var(--text-muted)" font-size="12">
                 0d
               </text>
               {cycleBars.bars.map((bar, idx) => {
@@ -339,32 +336,31 @@ export function GraphsScreen({
                       width={barW}
                       height={h}
                       rx="4"
-                      fill={bar.approximate ? 'var(--text-muted)' : 'var(--accent)'}
-                      opacity={bar.approximate ? 0.65 : 0.92}
+                      fill={bar.approximate ? 'var(--data-2)' : 'var(--data-1)'}
                     />
                     <text
                       x={x + barW / 2}
                       y={Math.max(12, y - 3)}
-                      textAnchor="middle"
+                      text-anchor="middle"
                       fill="var(--text)"
-                      fontSize="12"
+                      font-size="12"
                     >
                       {bar.lengthDays}
                     </text>
                   </g>
                 );
               })}
-              <text x="170" y="150" textAnchor="middle" fill="var(--text-muted)" fontSize="12">
+              <text x="170" y="150" text-anchor="middle" fill="var(--text-muted)" font-size="12">
                 Most recent {cycleBars.bars.length} cycles (days)
               </text>
             </svg>
             <div class="graph-legend">
               <span class="graph-legend-item">
-                <span class="graph-swatch" style={{ backgroundColor: 'var(--lamp)' }} />
+                <span class="graph-swatch" style={{ backgroundColor: 'var(--data-2)' }} />
                 Median ({cycleBars.medianDays}d)
               </span>
               <span class="graph-legend-item">
-                <span class="graph-swatch" style={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--border)' }} />
+                <span class="graph-swatch" style={{ backgroundColor: 'var(--surface)' }} />
                 Typical range (21–{cycleBars.ageBandHigh}d)
               </span>
             </div>
@@ -373,8 +369,8 @@ export function GraphsScreen({
       </section>
 
       {/* 4. Timeline visual (last 14 days) */}
-      <section class="card" aria-label="Timeline visual graph">
-        <h3 class="card-title">14-day flow and pain visual</h3>
+      <section class="chart-section" aria-label="Timeline visual graph">
+        <h2 class="card-title">14-day flow and pain visual</h2>
         {!hasAnyRecentTimeline ? (
           <p class="muted" style={{ margin: 0 }}>
             Log check-ins on Today to see flow dots and pain bars over the last 14 days.
@@ -403,7 +399,7 @@ export function GraphsScreen({
                         : 0;
               return (
                 <g key={item.date}>
-                  <rect x={x} y="24" width="12" height="52" rx="3" fill="var(--surface-2)" />
+                  <rect x={x} y="24" width="12" height="52" rx="3" fill="var(--surface)" />
                   {pain > 0 && (
                     <rect
                       x={x}
@@ -411,7 +407,7 @@ export function GraphsScreen({
                       width="12"
                       height={barH}
                       rx="3"
-                      fill="var(--lamp)"
+                      fill="var(--data-1)"
                     />
                   )}
                   {dotR > 0 && (
@@ -419,19 +415,19 @@ export function GraphsScreen({
                       cx={x + 6}
                       cy="14"
                       r={dotR}
-                      fill={flow === 'spotting' ? 'var(--spotting)' : 'var(--flow)'}
+                      fill="var(--data-2)"
                     />
                   )}
                 </g>
               );
             })}
-            <text x="16" y="100" fill="var(--text-muted)" fontSize="12">
+            <text x="16" y="100" fill="var(--text-muted)" font-size="12">
               {addDays(today, -13).slice(5)}
             </text>
-            <text x="160" y="100" textAnchor="middle" fill="var(--text-muted)" fontSize="12">
-              Flow dots · Pain 0–10 bars
+            <text x="155" y="100" text-anchor="middle" fill="var(--text-muted)" font-size="12">
+              Flow &amp; pain 0–10
             </text>
-            <text x="304" y="100" textAnchor="end" fill="var(--text-muted)" fontSize="12">
+            <text x="304" y="100" text-anchor="end" fill="var(--text-muted)" font-size="12">
               Today
             </text>
           </svg>
@@ -439,8 +435,8 @@ export function GraphsScreen({
       </section>
 
       {/* 5. Medicine by week bars */}
-      <section class="card" aria-label="Medicine by week graph">
-        <h3 class="card-title">Medicine entries by week</h3>
+      <section class="chart-section" aria-label="Medicine by week graph">
+        <h2 class="card-title">Medicine entries by week</h2>
         {medicineWeekly.series.length === 0 ? (
           <p class="muted" style={{ margin: 0 }}>
             No medicine doses logged in the last 4 weeks. Entries added on Today appear by generic
@@ -479,9 +475,9 @@ export function GraphsScreen({
                             <text
                               x={x + subW / 2}
                               y={Math.max(12, 100 - h)}
-                              textAnchor="middle"
+                              text-anchor="middle"
                               fill="var(--text)"
-                              fontSize="12"
+                              font-size="12"
                             >
                               {count}
                             </text>
@@ -492,9 +488,9 @@ export function GraphsScreen({
                     <text
                       x={groupX + 20}
                       y="128"
-                      textAnchor="middle"
+                      text-anchor="middle"
                       fill="var(--text-muted)"
-                      fontSize="12"
+                      font-size="12"
                     >
                       {wk.label}
                     </text>
@@ -522,14 +518,14 @@ export function GraphsScreen({
 
       {/* 6. Lifestyle patterns visual (only if already unlocked) */}
       {lifestyle.patterns.length > 0 ? (
-        <section class="card" aria-label="Lifestyle pattern visuals">
-          <h3 class="card-title">Unlocked lifestyle patterns</h3>
+        <section class="chart-section" aria-label="Lifestyle pattern visuals">
+          <h2 class="card-title">Unlocked lifestyle patterns</h2>
           {lifestyle.patterns.map((p) => {
             const totalDays = Math.max(1, p.groupACount + p.groupBCount);
             const widthA = Math.round((p.groupACount / totalDays) * 168);
             const widthB = Math.round((p.groupBCount / totalDays) * 168);
             return (
-              <div key={p.id} style={{ paddingBlock: '8px', borderTop: '1px solid var(--border)' }}>
+              <div key={p.id} class="row-stack" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                 <p style={{ margin: '0 0 6px 0', fontWeight: 700 }}>{p.statement}</p>
                 <svg
                   class="graph-svg"
@@ -537,14 +533,14 @@ export function GraphsScreen({
                   role="img"
                   aria-label={`${p.statement}. Comparison across ${p.groupACount} pattern days and ${p.groupBCount} other days, shift ${p.diffPoints}.`}
                 >
-                  <text x="2" y="20" fill="var(--text)" fontSize="12">
+                  <text x="2" y="20" fill="var(--text)" font-size="12">
                     Focus group ({p.groupACount}d)
                   </text>
-                  <rect x="128" y="8" width={Math.max(8, widthA)} height="16" rx="4" fill="var(--water)" />
-                  <text x="2" y="48" fill="var(--text-muted)" fontSize="12">
+                  <rect x="128" y="8" width={Math.max(8, widthA)} height="16" rx="4" fill="var(--data-1)" />
+                  <text x="2" y="48" fill="var(--text-muted)" font-size="12">
                     Other days ({p.groupBCount}d)
                   </text>
-                  <rect x="128" y="36" width={Math.max(8, widthB)} height="16" rx="4" fill="var(--sleep)" />
+                  <rect x="128" y="36" width={Math.max(8, widthB)} height="16" rx="4" fill="var(--data-2)" />
                 </svg>
                 <p class="muted" style={{ margin: '2px 0 0 0' }}>
                   Effect d = {p.effectD} · Diff {p.diffPoints} · This is a pattern, not proof of cause.
@@ -554,8 +550,8 @@ export function GraphsScreen({
           })}
         </section>
       ) : (
-        <section class="card" aria-label="Lifestyle patterns unlock status">
-          <h3 class="card-title">Lifestyle patterns</h3>
+        <section class="chart-section" aria-label="Lifestyle patterns unlock status">
+          <h2 class="card-title">Lifestyle patterns</h2>
           <p class="muted" style={{ margin: 0 }}>
             Unlocks after 14 flow-free Body days with a qualifying shift (currently{' '}
             <strong class="tabular">{lifestyle.nonBleedingDaysCount}</strong> flow-free days). No

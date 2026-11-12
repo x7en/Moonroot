@@ -2,9 +2,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { deflateSync } from 'node:zlib';
 
-const BG = [0x11, 0x15, 0x1f, 0xff] as const; // #11151F deep dusk indigo
-const MOON = [0xf2, 0xb9, 0x6b, 0xff] as const; // #F2B96B warm lamp crescent
-const SPROUT = [0x7a, 0xcb, 0xa5, 0xff] as const; // #7ACBA5 root green
+const BG = [0x70, 0x01, 0x43, 0xff] as const; // #700143 royal purple
+const MOON = [0xf9, 0xf6, 0xbd, 0xff] as const; // #F9F6BD butter crescent
+const SPROUT = [0x8a, 0x9a, 0x3a, 0xff] as const; // #8A9A3A sprout leaf green
 
 function crc32(buf: Uint8Array): number {
   let c = 0xffffffff;
@@ -99,12 +99,13 @@ function renderMoonSproutIcon(size: number): Uint8Array {
 const iconsDir = resolve(process.cwd(), 'public/icons');
 mkdirSync(iconsDir, { recursive: true });
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#11151F"/>
-  <path d="M132 276a132 132 0 0 0 248 24 108 108 0 0 1-196-54 110 110 0 0 1 12-50 132 132 0 0 0-64 80Z" fill="#F2B96B"/>
-  <path d="M256 350V218" stroke="#7ACBA5" stroke-width="20" stroke-linecap="round"/>
-  <path d="M256 250c-54-2-92-36-96-78 48-6 86 22 96 78Z" fill="#7ACBA5"/>
-  <path d="M256 234c54-2 92-36 96-78-48-6-86 22-96 78Z" fill="#7ACBA5"/>
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Moonroot crescent and sprout">
+  <title>Moonroot crescent and sprout</title>
+  <rect width="512" height="512" rx="112" fill="#700143"/>
+  <path d="M132 276a132 132 0 0 0 248 24 108 108 0 0 1-196-54 110 110 0 0 1 12-50 132 132 0 0 0-64 80Z" fill="#F9F6BD"/>
+  <path d="M256 350V218" stroke="#8A9A3A" stroke-width="20" stroke-linecap="round"/>
+  <path d="M256 250c-54-2-92-36-96-78 48-6 86 22 96 78Z" fill="#8A9A3A"/>
+  <path d="M256 234c54-2 92-36 96-78-48-6-86 22-96 78Z" fill="#8A9A3A"/>
 </svg>
 `;
 
