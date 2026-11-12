@@ -16,15 +16,14 @@ function parseCssVars(blockBody: string): Record<string, string> {
 function extractThemesFromCss(css: string): Record<string, Record<string, string>> {
   const themes: Record<string, Record<string, string>> = {};
   const rootMatch = css.match(/:root\s*\{([^}]+)\}/i);
-  if (rootMatch?.[1]) {
-    themes.dusk = parseCssVars(rootMatch[1]);
-  }
+  const rootVars = rootMatch?.[1] ? parseCssVars(rootMatch[1]) : {};
+  themes.root = rootVars;
   const attrMatches = css.matchAll(/\[data-theme=['"]([a-z0-9-]+)['"]\]\s*\{([^}]+)\}/gi);
   for (const m of attrMatches) {
     const name = m[1];
     const body = m[2];
     if (name && body) {
-      themes[name] = { ...(themes.dusk ?? {}), ...parseCssVars(body) };
+      themes[name] = { ...rootVars, ...parseCssVars(body) };
     }
   }
   return themes;
@@ -57,11 +56,14 @@ describe('Theme WCAG contrast checks', () => {
       expect(themes[required]).toBeDefined();
     }
 
-    // Midnight uses a true #000000 AMOLED background
+    // Default root & Dawn use Butter palette; Midnight uses #000000 AMOLED background
+    expect(themes.root?.bg?.toLowerCase()).toBe('#f9f6bd');
+    expect(themes.dawn?.bg?.toLowerCase()).toBe('#f9f6bd');
+    expect(themes.dusk?.bg?.toLowerCase()).toBe('#3a011f');
     expect(themes.midnight?.bg?.toLowerCase()).toBe('#000000');
 
-    // Every unlockable theme + dusk + high-contrast must pass >= 4.5:1 on text & buttons and >= 3.0:1 on marks
-    for (const themeName of ['dusk', 'high-contrast', 'meadow', 'ocean', 'rose', 'midnight']) {
+    // Every theme must pass >= 4.5:1 on text/bars/buttons and >= 3.0:1 on data/verdict icon badges
+    for (const themeName of ['dusk', 'dawn', 'high-contrast', 'meadow', 'ocean', 'rose', 'midnight']) {
       const t = themes[themeName];
       expect(t).toBeDefined();
       if (!t) continue;
@@ -70,7 +72,27 @@ describe('Theme WCAG contrast checks', () => {
       for (const surface of surfaces) {
         expect(contrastRatio(t.text ?? '', surface)).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(t['text-muted'] ?? '', surface)).toBeGreaterThanOrEqual(4.5);
+      }
 
+      expect(contrastRatio(t['accent-text'] ?? '', t.accent ?? '')).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(t['on-accent'] ?? '', t.accent ?? '')).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(t['bar-text'] ?? '', t.bar ?? '')).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(t['bar-active'] ?? '', t.bar ?? '')).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(t['lamp-text'] ?? '', t.lamp ?? '')).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(t['data-1'] ?? '', t.bg ?? '')).toBeGreaterThanOrEqual(3.0);
+      expect(contrastRatio(t['data-2'] ?? '', t.bg ?? '')).toBeGreaterThanOrEqual(3.0);
+
+      for (const lvl of ['green', 'yellow', 'orange', 'red'] as const) {
+        expect(
+          contrastRatio(t[`level-${lvl}-fg`] ?? '', t[`level-${lvl}`] ?? ''),
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+
+    for (const themeName of ['dusk', 'high-contrast', 'meadow', 'ocean', 'rose', 'midnight']) {
+      const t = themes[themeName];
+      if (!t) continue;
+      for (const surface of [t.bg, t.surface, t['surface-2']].filter((s): s is string => Boolean(s))) {
         for (const mark of [
           t.flow,
           t.spotting,
@@ -85,20 +107,6 @@ describe('Theme WCAG contrast checks', () => {
           expect(contrastRatio(mark ?? '', surface)).toBeGreaterThanOrEqual(3.0);
         }
       }
-
-      expect(contrastRatio(t['accent-text'] ?? '', t.accent ?? '')).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(t['lamp-text'] ?? '', t.lamp ?? '')).toBeGreaterThanOrEqual(4.5);
-    }
-
-    // Dawn main text, muted text, accent button text >= 4.5:1
-    const dawn = themes.dawn;
-    expect(dawn).toBeDefined();
-    if (dawn) {
-      for (const surface of [dawn.bg, dawn.surface, dawn['surface-2']]) {
-        expect(contrastRatio(dawn.text ?? '', surface ?? '')).toBeGreaterThanOrEqual(4.5);
-        expect(contrastRatio(dawn['text-muted'] ?? '', surface ?? '')).toBeGreaterThanOrEqual(4.5);
-      }
-      expect(contrastRatio(dawn['accent-text'] ?? '', dawn.accent ?? '')).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

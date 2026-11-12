@@ -4,6 +4,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: process.env.VITE_BASE || '/',
+  build: {
+    sourcemap: false,
+  },
   plugins: [
     preact(),
     VitePWA({
@@ -13,8 +16,8 @@ export default defineConfig({
         name: 'Moonroot',
         short_name: 'Moonroot',
         description: 'Private offline journal for cycles and symptoms',
-        theme_color: '#11151F',
-        background_color: '#11151F',
+        theme_color: '#F9F6BD',
+        background_color: '#F9F6BD',
         display: 'standalone',
         start_url: '.',
         icons: [

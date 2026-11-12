@@ -38,7 +38,17 @@ import { Sprout } from '../companion/Sprout';
 import { DangerSignSheet } from '../components/DangerSignSheet';
 import { FLOW_OPTIONS, FlowGlyph } from '../components/FlowGlyphs';
 import { MedicineSheet } from '../components/MedicineSheet';
+import { ScatteredDots } from '../components/ScatteredDots';
 import { formatShortDate } from './CycleScreen';
+
+function greetingForNow(nowIso: Stamp, selectedDate: DateKey, today: DateKey): string {
+  if (selectedDate !== today) return `Editing ${selectedDate}`;
+  const m = /T(\d{2}):/.exec(nowIso);
+  const hour = m ? Number(m[1]) : 12;
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 interface TodayScreenProps {
   today: DateKey;
@@ -381,13 +391,66 @@ export function TodayScreen({
       ),
   );
 
+  const greeting = greetingForNow(nowIso, selectedDate, today);
+
   return (
     <div>
+      <h1 class="screen-title">{greeting}</h1>
+
+      <section
+        class={`sprout-hero${dayLogs.length === 0 ? ' dots-backdrop' : ''}`}
+        aria-label="Companion sprout"
+      >
+        {dayLogs.length === 0 && <ScatteredDots tone="bg" />}
+        <button
+          type="button"
+          class="sprout-tap-btn dots-content"
+          aria-label={
+            profile.sproutName
+              ? `Talk to ${profile.sproutName}`
+              : 'Talk to sprout'
+          }
+          onClick={() => setSproutTapCount((c) => c + 1)}
+        >
+          <Sprout
+            stage={companion.stage}
+            mood={step2.mood}
+            rings={companion.rings}
+            name={profile.sproutName}
+            reaction={companion.stage >= 1 ? activeReaction : null}
+            petalBurst={companion.stage >= 2 && activePetalBurst}
+            stageUp={activeStageUp}
+            reducedMotion={reducedMotion}
+            size={96}
+          />
+        </button>
+        <div class="dots-content">
+          <div style={{ fontWeight: 700, fontSize: '1.125rem' }}>
+            {profile.sproutName ? `${profile.sproutName} · ` : ''}
+            {step2.stageInfo.name}
+          </div>
+          <div class="muted tabular" style={{ marginTop: '2px' }}>
+            {moodDisplayLabel(step2.mood)} · {companion.rings} rings · {companion.badges.length} of 8
+            badges
+          </div>
+          {activeStageUp && (
+            <p role="status" style={{ margin: '4px 0 0 0', fontWeight: 700 }}>
+              Stage {companion.stage}: {step2.stageInfo.name}
+            </p>
+          )}
+          {sproutTapCount >= 0 && (
+            <p role="status" class="muted" style={{ margin: '4px 0 0 0' }}>
+              {pickTapMessage(sproutTapCount)}
+            </p>
+          )}
+        </div>
+      </section>
+
       {dayLog === null &&
       selectedDate === today &&
       openEvents.length === 0 &&
       verdict.level === 'incomplete' ? (
-        <section class="card verdict-card verdict-incomplete" aria-label="Today check-in summary">
+        <section class="verdict-card verdict-incomplete" aria-label="Today check-in summary">
           <div class="verdict-badge">
             <span class="verdict-icon" aria-hidden="true">
               {verdictUi.icon}
@@ -402,7 +465,7 @@ export function TodayScreen({
         </section>
       ) : (
         <section
-          class={`card ${verdictUi.cssClass}`}
+          class={verdictUi.cssClass}
           aria-label="Today verdict"
           role="region"
         >
@@ -414,10 +477,7 @@ export function TodayScreen({
           </div>
 
           {verdict.actionPrepend && (
-            <p
-              class="notice-banner"
-              style={{ borderColor: 'var(--level-red)', fontWeight: 700, marginTop: '10px' }}
-            >
+            <p class="notice-banner" style={{ fontWeight: 700, marginTop: '10px' }}>
               {verdict.actionPrepend}
             </p>
           )}
@@ -438,8 +498,8 @@ export function TodayScreen({
           )}
 
           {verdict.level === 'red' && (
-            <div style={{ marginTop: '10px' }}>
-              <button type="button" class="btn btn-danger-solid" onClick={onOpenGetHelp}>
+            <div style={{ marginTop: '12px' }}>
+              <button type="button" class="btn btn-bar" onClick={onOpenGetHelp}>
                 Open Get help
               </button>
             </div>
@@ -447,53 +507,8 @@ export function TodayScreen({
         </section>
       )}
 
-      <section class="card sprout-card" aria-label="Companion sprout">
-        <button
-          type="button"
-          class="sprout-tap-btn"
-          aria-label={
-            profile.sproutName
-              ? `Talk to ${profile.sproutName}`
-              : 'Talk to sprout'
-          }
-          onClick={() => setSproutTapCount((c) => c + 1)}
-        >
-          <Sprout
-            stage={companion.stage}
-            mood={step2.mood}
-            rings={companion.rings}
-            name={profile.sproutName}
-            reaction={companion.stage >= 1 ? activeReaction : null}
-            petalBurst={companion.stage >= 2 && activePetalBurst}
-            stageUp={activeStageUp}
-            reducedMotion={reducedMotion}
-            size={96}
-          />
-        </button>
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.15rem' }}>
-            {profile.sproutName ? `${profile.sproutName} · ` : ''}
-            {step2.stageInfo.name}
-          </div>
-          <div class="muted tabular" style={{ marginTop: '2px' }}>
-            {moodDisplayLabel(step2.mood)} · {companion.rings} rings · {companion.badges.length} of 8
-            badges
-          </div>
-          {activeStageUp && (
-            <p role="status" style={{ margin: '4px 0 0 0', color: 'var(--lamp)', fontWeight: 700 }}>
-              Stage {companion.stage}: {step2.stageInfo.name}
-            </p>
-          )}
-          {sproutTapCount >= 0 && (
-            <p role="status" class="muted" style={{ margin: '4px 0 0 0' }}>
-              {pickTapMessage(sproutTapCount)}
-            </p>
-          )}
-        </div>
-      </section>
-
       {step2.sundayEvening && (
-        <section class="card" aria-label="Sunday weekly review" style={{ borderColor: 'var(--lamp)' }}>
+        <section class="card" aria-label="Sunday weekly review">
           <div class="btn-row" style={{ justifyContent: 'space-between' }}>
             <div>
               <h2 class="card-title" style={{ marginBottom: '2px' }}>
@@ -506,7 +521,7 @@ export function TodayScreen({
             {!weeklyOpen ? (
               <button
                 type="button"
-                class="btn btn-lamp btn-small"
+                class="btn btn-primary btn-small"
                 onClick={() => {
                   setWeeklyOpen(true);
                   void onOpenWeeklyReview?.();
@@ -525,7 +540,7 @@ export function TodayScreen({
             )}
           </div>
           {weeklyOpen && (
-            <div style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+            <div style={{ marginTop: '12px' }}>
               <p class="tabular" style={{ margin: '0 0 6px 0' }}>
                 <strong>Days checked in this week:</strong> {step2.weeklyReview.daysCheckedInThisWeek}{' '}
                 of 7
@@ -548,18 +563,20 @@ export function TodayScreen({
         </section>
       )}
 
-      <p class="notice-banner tabular" aria-label="Forecast summary" style={{ marginBottom: '12px' }}>
-        {step2.prediction.likely
-          ? `Forecast (${step2.prediction.confidence.score}% confidence): next period likely between ${formatShortDate(step2.prediction.likely[0])} and ${formatShortDate(step2.prediction.likely[1])}.`
-          : step2.prediction.droppedLikelyWindow && step2.prediction.daysSinceStart !== null
-            ? `Forecast (${step2.prediction.confidence.score}% confidence): Day ${step2.prediction.daysSinceStart}.${step2.prediction.longestGapDays !== null ? ` Longest gap logged is ${step2.prediction.longestGapDays} days.` : ''}`
-            : step2.cycles.openCycle
-              ? `Forecast (${step2.prediction.confidence.score}% confidence): Day ${step2.cycles.openCycle.daysSinceStart}. Log another cycle to narrow ranges.`
-              : 'Confidence 10%. Log your first period to start forecasts.'}
-      </p>
+      <section class="card" aria-label="Forecast summary">
+        <p class="tabular" style={{ margin: 0 }}>
+          {step2.prediction.likely
+            ? `Forecast (${step2.prediction.confidence.score}% confidence): next period likely between ${formatShortDate(step2.prediction.likely[0])} and ${formatShortDate(step2.prediction.likely[1])}.`
+            : step2.prediction.droppedLikelyWindow && step2.prediction.daysSinceStart !== null
+              ? `Forecast (${step2.prediction.confidence.score}% confidence): Day ${step2.prediction.daysSinceStart}.${step2.prediction.longestGapDays !== null ? ` Longest gap logged is ${step2.prediction.longestGapDays} days.` : ''}`
+              : step2.cycles.openCycle
+                ? `Forecast (${step2.prediction.confidence.score}% confidence): Day ${step2.cycles.openCycle.daysSinceStart}. Log another cycle to narrow ranges.`
+                : 'Confidence 10%. Log your first period to start forecasts.'}
+        </p>
+      </section>
 
       {selectedDate === today && step2.catchUpDays.length >= 2 && !catchUpHidden && (
-        <section class="card" aria-label="Catch-up check-in" style={{ borderColor: 'var(--lamp)' }}>
+        <section class="card" aria-label="Catch-up check-in">
           <div class="btn-row" style={{ justifyContent: 'space-between' }}>
             <h2 class="card-title" style={{ margin: 0 }}>
               Welcome back. Want a 20-second catch-up?
@@ -574,14 +591,8 @@ export function TodayScreen({
           {step2.catchUpDays.map((d) => {
             const existing = dayLogs.find((l) => l.date === d);
             return (
-              <div
-                key={d}
-                style={{
-                  paddingBlock: '8px',
-                  borderTop: '1px solid var(--border)',
-                }}
-              >
-                <div class="tabular" style={{ fontWeight: 700, marginBottom: '6px' }}>
+              <div key={d} class="row-stack" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                <div class="tabular" style={{ fontWeight: 700, marginBottom: '4px' }}>
                   {d}
                 </div>
                 <div class="chip-group">
@@ -616,7 +627,7 @@ export function TodayScreen({
       {openEvents.map((ev) => (
         <section
           key={ev.id}
-          class="card verdict-card verdict-orange"
+          class="verdict-card verdict-orange"
           aria-label={`Open event ${ev.ruleIds.join(', ')}`}
         >
           <div class="verdict-badge">
@@ -652,7 +663,7 @@ export function TodayScreen({
       {openWatchItems.map((item) => (
         <section
           key={item.id}
-          class="card verdict-card verdict-yellow"
+          class="verdict-card verdict-yellow"
           aria-label="Watch list check"
         >
           <div class="verdict-badge">
@@ -721,7 +732,7 @@ export function TodayScreen({
       )}
 
       {activeFlowIds.has('hormone-course-changed') && !hormonePromptLater && (
-        <section class="card" aria-label="Start fresh question" style={{ borderColor: 'var(--accent)' }}>
+        <section class="card" aria-label="Start fresh question">
           <h2 class="card-title">Start predictions fresh from this date?</h2>
           <p class="muted" style={{ marginTop: 0 }}>
             Starting or stopping hormone medicine changes bleeding patterns.
@@ -753,7 +764,7 @@ export function TodayScreen({
       )}
 
       {unclearToConfirm && (
-        <section class="card" aria-label="Period confirmation" style={{ borderColor: 'var(--lamp)' }}>
+        <section class="card" aria-label="Period confirmation">
           <h2 class="card-title">Was bleeding from {unclearToConfirm.firstDate} a period?</h2>
           <div class="btn-row">
             <button
@@ -843,7 +854,7 @@ export function TodayScreen({
         </div>
       </section>
 
-      <section class="card" aria-label="Flow check-in">
+      <section class="flow-section" aria-label="Flow check-in">
         <h2 class="card-title">Flow</h2>
         <div class="flow-grid">
           {FLOW_OPTIONS.map((opt) => {
@@ -858,12 +869,10 @@ export function TodayScreen({
                 onClick={() => handleFlowTap(opt.value)}
               >
                 <FlowGlyph flow={opt.value} selected={selected} />
-                <span>{opt.label}</span>
-                {selected && (
-                  <span aria-hidden="true" style={{ fontSize: '0.75rem' }}>
-                    ✓
-                  </span>
-                )}
+                <span>
+                  {selected && <span aria-hidden="true">✓ </span>}
+                  {opt.label}
+                </span>
               </button>
             );
           })}
@@ -873,7 +882,7 @@ export function TodayScreen({
           current.flow === 'light' ||
           current.flow === 'medium' ||
           current.flow === 'heavy') && (
-          <div style={{ marginTop: '14px' }}>
+          <div class="card" style={{ marginTop: '14px', marginBottom: 0 }}>
             <div class="field">
               <span class="field-label">Protection</span>
               <div class="chip-group">
@@ -1036,12 +1045,12 @@ export function TodayScreen({
         </p>
 
         {current.danger.length > 0 && (
-          <div class="notice-banner" style={{ borderColor: 'var(--level-red)' }}>
+          <div class="notice-banner">
             <p style={{ marginTop: 0 }}>
               Selected: <strong>{dangerLabels.join(', ')}</strong>. If you feel very unwell now,
               open Get help.
             </p>
-            <button type="button" class="btn btn-danger-solid" onClick={onOpenGetHelp}>
+            <button type="button" class="btn btn-primary" onClick={onOpenGetHelp}>
               Open Get help
             </button>
           </div>
@@ -1050,7 +1059,7 @@ export function TodayScreen({
         <div class="btn-row">
           <button
             type="button"
-            class={dangerTriggered && !current.dangerAnswered ? 'btn btn-lamp' : 'btn'}
+            class={dangerTriggered && !current.dangerAnswered ? 'btn btn-primary' : 'btn'}
             onClick={() => setDangerOpen(true)}
           >
             Any of these right now?

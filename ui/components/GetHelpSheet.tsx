@@ -32,8 +32,8 @@ export function GetHelpSheet({ open, under18, regionInfo, onClose }: GetHelpShee
           <h3 class="card-title">Emergency numbers ({regionInfo.name})</h3>
           {regionInfo.emergency.length === 0 ? (
             <p class="muted">
-              No preset emergency number is stored for your region. Call your local emergency
-              service or go to the nearest hospital.
+              No preset number is saved for this region. Call local emergency care or visit a
+              hospital.
             </p>
           ) : (
             <div class="btn-row">
@@ -41,7 +41,7 @@ export function GetHelpSheet({ open, under18, regionInfo, onClose }: GetHelpShee
                 <a
                   key={item.number}
                   href={`tel:${item.number}`}
-                  class="btn btn-danger-solid"
+                  class="btn btn-primary"
                   aria-label={`Call ${item.label} at ${item.number}`}
                 >
                   Call {item.number} · {item.label}
@@ -62,13 +62,13 @@ export function GetHelpSheet({ open, under18, regionInfo, onClose }: GetHelpShee
 
         <div class="card">
           <p style={{ marginTop: 0 }}>
-            If you feel unsafe, or you are thinking of hurting yourself, tell someone you trust now,
-            or call the emergency number above.
+            If you feel unsafe or may hurt yourself, tell someone you trust now. You can also call
+            an emergency number above.
           </p>
           <p style={{ marginBottom: 0 }}>
             {under18
-              ? 'If someone is hurting you, or made you do something you did not want, you can tell a parent, relative or school nurse.'
-              : 'If someone is hurting you, or made you do something you did not want, you can tell a doctor, a nurse or an adult you trust.'}
+              ? 'If someone is hurting you, tell a parent, relative or school nurse.'
+              : 'If someone is hurting you, tell a doctor, nurse or trusted adult.'}
           </p>
         </div>
       </div>

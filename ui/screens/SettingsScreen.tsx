@@ -202,15 +202,30 @@ export function SettingsScreen({
     }
   }
 
+  const displayThemes = [...THEME_CATALOGUE].sort((a, b) => {
+    if (a.id === 'dawn') return -1;
+    if (b.id === 'dawn') return 1;
+    return 0;
+  });
+
+  function themeDisplayLabel(opt: (typeof THEME_CATALOGUE)[number]): string {
+    if (opt.id === 'dawn') return 'Butter (light)';
+    if (opt.id === 'dusk') return 'Night';
+    return opt.label;
+  }
+
   return (
     <div>
+      <h1 class="screen-title">Settings</h1>
+
       <section class="card" aria-label="Appearance and units">
         <h2 class="card-title">Appearance and units</h2>
         <div class="field">
           <span class="field-label">Theme</span>
           <div class="chip-group">
-            {THEME_CATALOGUE.map((opt) => {
+            {displayThemes.map((opt) => {
               const unlocked = canUseTheme(opt.id, companion);
+              const label = themeDisplayLabel(opt);
               return (
                 <button
                   key={opt.id}
@@ -223,13 +238,13 @@ export function SettingsScreen({
                     if (unlocked) void patchProfile({ theme: opt.id });
                   }}
                 >
-                  {unlocked ? opt.label : `${opt.label} (Stage ${opt.requiredStage})`}
+                  {unlocked ? label : `${label} (Stage ${opt.requiredStage})`}
                 </button>
               );
             })}
           </div>
           <p class="muted" style={{ margin: '6px 0 0 0' }}>
-            Dusk, Dawn, Match phone, and High contrast are always unlocked.
+            Butter (light), Night, Match phone, and High contrast are always unlocked.
           </p>
         </div>
 
@@ -590,9 +605,7 @@ export function SettingsScreen({
           </p>
         )}
 
-        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', marginBlock: '14px' }} />
-
-        <div class="field">
+        <div class="field" style={{ marginTop: '16px' }}>
           <label class="chip" style={{ width: '100%' }}>
             <input
               type="checkbox"
@@ -654,13 +667,11 @@ export function SettingsScreen({
           <span>Export without passphrase (anyone with the file can read it)</span>
         </label>
         <button type="button" class="btn btn-primary" onClick={() => void handleExport()}>
-          Export backup JSON
+          Save backup file (.json)
         </button>
         {backupMessage && <p style={{ marginBottom: '12px' }}>{backupMessage}</p>}
 
-        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', marginBlock: '16px' }} />
-
-        <div class="field">
+        <div class="field" style={{ marginTop: '18px' }}>
           <label htmlFor="restore-file-input">Restore from backup file (.json)</label>
           <input
             id="restore-file-input"
@@ -692,7 +703,7 @@ export function SettingsScreen({
             )}
             <button
               type="button"
-              class="btn btn-lamp"
+              class="btn btn-primary"
               onClick={() => void handleConfirmRestore()}
             >
               Replace data with this backup
@@ -701,12 +712,12 @@ export function SettingsScreen({
         )}
 
         {restoreError && (
-          <p role="alert" style={{ color: 'var(--level-red)', fontWeight: 700 }}>
+          <p role="alert" style={{ fontWeight: 700 }}>
             {restoreError}
           </p>
         )}
         {restoreSuccess && (
-          <p role="status" style={{ color: 'var(--level-green)', fontWeight: 700 }}>
+          <p role="status" style={{ fontWeight: 700 }}>
             {restoreSuccess}
           </p>
         )}
@@ -730,7 +741,7 @@ export function SettingsScreen({
       <section class="card" aria-label="Delete all data">
         <h2 class="card-title">Delete all data</h2>
         {deleteStep === 0 ? (
-          <button type="button" class="btn btn-danger-solid" onClick={() => setDeleteStep(1)}>
+          <button type="button" class="btn btn-bar" onClick={() => setDeleteStep(1)}>
             Delete all data
           </button>
         ) : (
@@ -762,7 +773,7 @@ export function SettingsScreen({
               </button>
               <button
                 type="button"
-                class="btn btn-danger-solid"
+                class="btn btn-bar"
                 disabled={deleteConfirmText.trim() !== 'DELETE'}
                 onClick={() => void onDeleteAll()}
               >

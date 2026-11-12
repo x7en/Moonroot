@@ -12,6 +12,7 @@ import type {
   Stamp,
 } from '../../core/model/types';
 import { Sprout } from '../companion/Sprout';
+import { ScatteredDots } from '../components/ScatteredDots';
 
 interface BodyScreenProps {
   today: DateKey;
@@ -28,6 +29,7 @@ interface BodyScreenProps {
   onSaveBodyLog: (log: BodyLog) => Promise<void>;
   onSaveStress: (date: DateKey, stress: 1 | 2 | 3 | 4 | 5 | undefined) => Promise<void>;
   onOpenGraphs?: () => void;
+  onTapSprout?: () => void;
 }
 
 const ML_PER_GLASS = 250;
@@ -79,7 +81,9 @@ export function BodyScreen({
   onSaveBodyLog,
   onSaveStress,
   onOpenGraphs,
+  onTapSprout,
 }: BodyScreenProps) {
+  const [bodySavedMsg, setBodySavedMsg] = useState('');
   const existingBody = bodyLogs.find((b) => b.date === selectedDate) ?? null;
   const existingDay = dayLogs.find((d) => d.date === selectedDate) ?? null;
   const waterUnit = profile.units.water;
@@ -140,6 +144,7 @@ export function BodyScreen({
     const run = writeChainRef.current.then(async () => {
       try {
         await onSaveBodyLog(next);
+        setBodySavedMsg(`Saved ${selectedDate}.`);
       } finally {
         pendingWritesRef.current -= 1;
         if (pendingWritesRef.current === 0) {
@@ -249,19 +254,40 @@ export function BodyScreen({
 
   return (
     <div>
+      <h1 class="screen-title">Body</h1>
+
       {companion && stageDef && (
         <section class="card sprout-card" aria-label="Body companion status">
-          <Sprout
-            stage={companion.stage}
-            mood={mood}
-            rings={companion.rings}
-            name={profile.sproutName}
-            reaction={reactionShown}
-            reducedMotion={reducedMotion}
-            size={84}
-          />
+          {onTapSprout ? (
+            <button
+              type="button"
+              class="sprout-tap-btn"
+              aria-label="Go to Today"
+              onClick={onTapSprout}
+            >
+              <Sprout
+                stage={companion.stage}
+                mood={mood}
+                rings={companion.rings}
+                name={profile.sproutName}
+                reaction={reactionShown}
+                reducedMotion={reducedMotion}
+                size={84}
+              />
+            </button>
+          ) : (
+            <Sprout
+              stage={companion.stage}
+              mood={mood}
+              rings={companion.rings}
+              name={profile.sproutName}
+              reaction={reactionShown}
+              reducedMotion={reducedMotion}
+              size={84}
+            />
+          )}
           <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '1.125rem' }}>
               {profile.sproutName ? `${profile.sproutName} · ` : ''}
               {stageDef.name}
             </div>
@@ -270,6 +296,11 @@ export function BodyScreen({
                 ? '+1 ring for a Body log today (up to 2 rings a day).'
                 : `Reach Stage 1 (3 rings) for Body log reactions. (${companion.rings} rings)`}
             </p>
+            {bodySavedMsg && (
+              <p role="status" class="muted" style={{ margin: '4px 0 0 0', fontWeight: 700 }}>
+                {bodySavedMsg}
+              </p>
+            )}
           </div>
         </section>
       )}
@@ -717,39 +748,45 @@ export function BodyScreen({
         </div>
       </section>
 
-      <section class="card" aria-label="Lifestyle patterns">
-        <h2 class="card-title">Lifestyle patterns</h2>
-        {lifestyle.patterns.length > 0 ? (
-          <div>
-            {lifestyle.patterns.map((pat) => (
-              <p key={pat.id} style={{ margin: '0 0 8px 0' }}>
-                {pat.statement}
-              </p>
-            ))}
-          </div>
-        ) : (
-          <div>
-            <p class="muted" style={{ marginTop: 0 }}>
-              Patterns look only at days without bleeding on that day and the next day. At least 14
-              non-bleeding days in each comparison group are needed before a pattern unlocks.
-            </p>
-            <div class="muted tabular" style={{ fontSize: '0.9rem' }}>
-              {lifestyle.readiness.map((item) => (
-                <div key={item.causeKey}>
-                  {item.label}: {item.loggedNonBleedingDays} of {item.requiredMinDays}+ non-bleeding
-                  days logged
-                </div>
+      <section
+        class={`card${lifestyle.patterns.length === 0 ? ' dots-backdrop' : ''}`}
+        aria-label="Lifestyle patterns"
+      >
+        {lifestyle.patterns.length === 0 && <ScatteredDots tone="surface" />}
+        <div class="dots-content">
+          <h2 class="card-title">Lifestyle patterns</h2>
+          {lifestyle.patterns.length > 0 ? (
+            <div>
+              {lifestyle.patterns.map((pat) => (
+                <p key={pat.id} style={{ margin: '0 0 8px 0' }}>
+                  {pat.statement}
+                </p>
               ))}
             </div>
-          </div>
-        )}
-        {onOpenGraphs && (
-          <div class="btn-row" style={{ marginTop: '12px' }}>
-            <button type="button" class="btn" onClick={onOpenGraphs}>
-              Graphs
-            </button>
-          </div>
-        )}
+          ) : (
+            <div>
+              <p class="muted" style={{ marginTop: 0 }}>
+                Patterns look only at days without bleeding on that day and the next day. At least
+                14 non-bleeding days in each comparison group are needed before a pattern unlocks.
+              </p>
+              <div class="muted tabular" style={{ fontSize: '0.875rem' }}>
+                {lifestyle.readiness.map((item) => (
+                  <div key={item.causeKey}>
+                    {item.label}: {item.loggedNonBleedingDays} of {item.requiredMinDays}+
+                    non-bleeding days logged
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {onOpenGraphs && (
+            <div class="btn-row" style={{ marginTop: '12px' }}>
+              <button type="button" class="btn" onClick={onOpenGraphs}>
+                Graphs
+              </button>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );
