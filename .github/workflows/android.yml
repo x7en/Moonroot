@@ -33,11 +33,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run typecheck, lint, tests, and simulation
+      - name: Run typecheck, lint, tests, Kotlin audit, and simulation
         run: |
           npm run typecheck
           npm run lint
           npm test
+          npm run android:kotlin-audit
           npm run sim
 
       - name: Build web bundle and sync Capacitor Android

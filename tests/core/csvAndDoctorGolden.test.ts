@@ -511,3 +511,48 @@ describe('CSV formula injection protection', () => {
     });
   }
 });
+
+describe('CSV vs Doctor File formula rendering', () => {
+  it('escapes formula-like notes only for CSV while preserving doctor-readable Markdown', () => {
+    const today = '2026-10-30';
+    const formulaNotes = ['=SUM(A1)', '+cmd', '-cmd', '@url'];
+    const individualLogs = formulaNotes.map((note, index) =>
+      day(addDays(today, index - formulaNotes.length), { note }),
+    );
+    const combinedNote = formulaNotes.join(' / ');
+    const dayLogs = [...individualLogs, day(today, { note: combinedNote })];
+
+    const csv = buildDayTableCsv({
+      today,
+      dayLogs,
+      medicines: [],
+      includeBody: false,
+      includeMedicines: false,
+    });
+    for (const note of formulaNotes) {
+      expect(csv.content).toContain(`,'${note}`);
+    }
+    expect(csv.content).toContain(`,'${combinedNote}`);
+
+    const doctorFile = buildDoctorFile({
+      today,
+      appVersion: '0.2.0',
+      profile: baseProfile(),
+      dayLogs,
+      medicines: [],
+      visits: [],
+      options: {
+        range: 'all',
+        format: 'md',
+        includeNotes: true,
+        includeMedicines: false,
+        includeIntimacy: false,
+      },
+    });
+    expect(doctorFile.content).toContain(combinedNote);
+    for (const note of formulaNotes) {
+      expect(doctorFile.content).toContain(note);
+      expect(doctorFile.content).not.toContain(`'${note}`);
+    }
+  });
+});
