@@ -40,10 +40,14 @@ const SYMPTOM_LABELS = new Map<string, string>(
 function csvCell(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) return '';
   const text = String(value);
-  if (/[",\r\n]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
+  const safeText =
+    typeof value === 'string' && ['=', '+', '-', '@', '\t', '\r'].includes(text[0] ?? '')
+      ? `'${text}`
+      : text;
+  if (/[",\r\n]/.test(safeText)) {
+    return `"${safeText.replace(/"/g, '""')}"`;
   }
-  return text;
+  return safeText;
 }
 
 function csvRow(cells: ReadonlyArray<string | number | boolean | null | undefined>): string {

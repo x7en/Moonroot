@@ -493,3 +493,66 @@ describe('Step 3 golden exports: Doctor file (with Part 6) and Day/Cycle CSV tab
     expect(noBodyCsv.content).not.toContain(',2000,');
   });
 });
+
+describe('CSV formula injection protection', () => {
+  for (const prefix of ['=', '+', '-', '@', '\t', '\r']) {
+    it(`prefixes note values beginning with ${JSON.stringify(prefix)}`, () => {
+      const today = '2026-10-30';
+      const dangerousNote = `${prefix}1+1`;
+      const csv = buildDayTableCsv({
+        today,
+        dayLogs: [day(today, { note: dangerousNote })],
+        medicines: [],
+        includeBody: false,
+        includeMedicines: false,
+      });
+
+      expect(csv.content).toContain(`'${dangerousNote}`);
+    });
+  }
+});
+
+describe('CSV vs Doctor File formula rendering', () => {
+  it('escapes formula-like notes only for CSV while preserving doctor-readable Markdown', () => {
+    const today = '2026-10-30';
+    const formulaNotes = ['=SUM(A1)', '+cmd', '-cmd', '@url'];
+    const individualLogs = formulaNotes.map((note, index) =>
+      day(addDays(today, index - formulaNotes.length), { note }),
+    );
+    const combinedNote = formulaNotes.join(' / ');
+    const dayLogs = [...individualLogs, day(today, { note: combinedNote })];
+
+    const csv = buildDayTableCsv({
+      today,
+      dayLogs,
+      medicines: [],
+      includeBody: false,
+      includeMedicines: false,
+    });
+    for (const note of formulaNotes) {
+      expect(csv.content).toContain(`,'${note}`);
+    }
+    expect(csv.content).toContain(`,'${combinedNote}`);
+
+    const doctorFile = buildDoctorFile({
+      today,
+      appVersion: '0.2.0',
+      profile: baseProfile(),
+      dayLogs,
+      medicines: [],
+      visits: [],
+      options: {
+        range: 'all',
+        format: 'md',
+        includeNotes: true,
+        includeMedicines: false,
+        includeIntimacy: false,
+      },
+    });
+    expect(doctorFile.content).toContain(combinedNote);
+    for (const note of formulaNotes) {
+      expect(doctorFile.content).toContain(note);
+      expect(doctorFile.content).not.toContain(`'${note}`);
+    }
+  });
+});

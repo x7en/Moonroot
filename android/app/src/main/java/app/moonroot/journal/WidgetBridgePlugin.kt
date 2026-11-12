@@ -14,7 +14,7 @@ class WidgetBridgePlugin : Plugin() {
     fun setState(call: PluginCall) {
         val stage = (call.getInt("stage") ?: 0).coerceIn(0, 6)
         val mood = call.getString("mood") ?: "calm"
-        val accent = call.getString("accent") ?: "#7ACBA5"
+        val accent = call.getString("accent") ?: "#700143"
 
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit()

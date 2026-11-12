@@ -6,11 +6,12 @@ import './styles/base.css';
 
 import { render } from 'preact';
 import { registerSW } from 'virtual:pwa-register';
+import { registerPwaServiceWorker } from '../platform/pwa';
 import { App } from './App';
 
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+registerPwaServiceWorker(() => {
   registerSW({ immediate: true });
-}
+});
 
 const root = document.getElementById('app');
 if (root) {

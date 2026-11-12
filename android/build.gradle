@@ -19,9 +19,25 @@ buildscript {
 apply from: "variables.gradle"
 
 allprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { dependency ->
+            if (dependency.requested.group == 'org.jetbrains.kotlin') {
+                dependency.useVersion(rootProject.ext.kotlin_version)
+                dependency.because('Keep Kotlin dependencies aligned across the app and Capacitor plugins')
+            }
+        }
+    }
     repositories {
         google()
         mavenCentral()
+    }
+}
+
+subprojects {
+    if (project.name.startsWith('capacitor-')) {
+        // Capacitor Filesystem otherwise falls back to Kotlin 2.2.20, which can
+        // conflict with the Kotlin plugin configured by this root project.
+        project.ext.set('kotlin_version', rootProject.ext.kotlin_version)
     }
 }
 

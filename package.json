@@ -15,6 +15,7 @@
     "rules:export": "tsx scripts/export-rules.ts",
     "widget:art": "tsx scripts/widget-art.ts",
     "android:verify": "tsx scripts/verify-android-manifest.ts",
+    "android:kotlin-audit": "node scripts/audit-capacitor-kotlin.mjs",
     "sim": "tsx scripts/sim.ts",
     "build:core": "tsc -p tsconfig.build.json",
     "build": "npm run build:core && vite build"

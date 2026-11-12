@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeDefaultProfile, MoonrootStore } from '../../app/store';
+import { getRegionOptions, makeDefaultProfile, MoonrootStore } from '../../app/store';
 import { IndexedDBStorage } from '../../data/idb';
 import { getLocalDateKey, getLocalStamp } from '../../platform/web';
 import { App } from '../../ui/App';
@@ -105,6 +105,38 @@ describe('UI refresh navigation, Butter/Night defaults, single-h1, error recover
 
     expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(consoleErrors).toEqual([]);
+  });
+
+  it('completely masks invalid routes and regional help details while PIN-locked', async () => {
+    const store = await makeFreshStore();
+    const nowIso = getLocalStamp();
+    await store.storage.saveProfile({
+      ...makeDefaultProfile(nowIso),
+      birthYear: 1995,
+      menarcheAge: 13,
+      disclaimerAcceptedAt: nowIso,
+      lock: { type: 'pin', hash: 'test-hash', salt: 'test-salt' },
+    });
+    await store.init();
+    store.locked = true;
+    expect(store.locked).toBe(true);
+    window.history.replaceState(null, '', '/non-existent-page');
+
+    render(<App initialStore={store} />);
+    await screen.findByText('Enter your PIN to open.');
+    expect(screen.queryByRole('heading', { level: 1, name: 'Page not found' })).toBeNull();
+
+    const renderedText = (document.body.textContent ?? '').toLocaleLowerCase();
+    const forbiddenText = [
+      'Get help',
+      '1122',
+      '115',
+      ...getRegionOptions().map((region) => region.name),
+    ];
+    for (const value of forbiddenText) {
+      const occurrences = renderedText.split(value.toLocaleLowerCase()).length - 1;
+      expect(occurrences, `expected no occurrence of ${value}`).toBe(0);
+    }
   });
 
   it('isolates verdict cards from Citron .card and displays dismissible alert banner on save errors', async () => {

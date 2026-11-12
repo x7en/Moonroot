@@ -15,16 +15,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Node 22
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Set up JDK 21 (Temurin)
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
@@ -33,11 +33,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run typecheck, lint, tests, and simulation
+      - name: Run typecheck, lint, tests, Kotlin audit, and simulation
         run: |
           npm run typecheck
           npm run lint
           npm test
+          npm run android:kotlin-audit
           npm run sim
 
       - name: Build web bundle and sync Capacitor Android
@@ -59,7 +60,7 @@ jobs:
         run: cp android/app/build/outputs/apk/debug/app-debug.apk moonroot.apk
 
       - name: Upload moonroot-debug APK artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: moonroot-debug-apk
           path: moonroot.apk
